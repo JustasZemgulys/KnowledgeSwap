@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
+import 'package:knowledgeswap/test_ui.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
@@ -26,36 +27,36 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        /*bottomNavigationBar: BottomNavigationBar(
+        bottomNavigationBar: BottomNavigationBar(
           onTap: (newIndex) async {
             if (newIndex == 0) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SongSearch()),
+                MaterialPageRoute(builder: (context) => const TestScreen()),
               );
             } else if (newIndex == 1) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const AlbumSearchScreen()),
+                    builder: (context) => const TestScreen()),
               );
             } else if (newIndex == 2) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const RecommendedSongScreen()),
+                    builder: (context) => const TestScreen()),
               );
             }
           },
           items: const [
             BottomNavigationBarItem(
-              label: "Songs",
-              icon: Icon(Icons.music_note),
+              label: "Tests",
+              icon: Icon(Icons.question_mark),
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.album), label: "Albums"),
-            BottomNavigationBarItem(icon: Icon(Icons.recommend), label: "Recommended"),
+            BottomNavigationBarItem(icon: Icon(Icons.folder), label: "Resources"),
+            BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
           ],
-        ),*/
+        ),
         appBar: AppBar(
           iconTheme: const IconThemeData(color: Colors.black),
           actions: [
