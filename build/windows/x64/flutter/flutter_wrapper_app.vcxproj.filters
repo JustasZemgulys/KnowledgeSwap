@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Zero\Desktop\School stuff\Uni\8 Semestras\Bakalauro darbas\KnowledgeSwap\knowledgeswap\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Zero\Desktop\School stuff\Uni\8 Semestras\Bakalauro darbas\KnowledgeSwap\knowledgeswap\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Zero\Desktop\School stuff\Uni\8 Semestras\Bakalauro darbas\KnowledgeSwap\knowledgeswap\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Zero\Desktop\School stuff\Uni\8 Semestras\Bakalauro darbas\KnowledgeSwap\knowledgeswap\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Zero\Desktop\School stuff\Uni\8 Semestras\Bakalauro darbas\KnowledgeSwap\knowledgeswap\windows\flutter\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{9655C6DF-2624-397F-8F89-9D6AB240E5CE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{48EC997D-77B9-3986-B1F5-A45900E75BBF}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

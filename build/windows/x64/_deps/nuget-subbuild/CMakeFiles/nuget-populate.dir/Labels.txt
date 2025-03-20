@@ -1,0 +1,15 @@
+# Target labels
+ nuget-populate
+# Source files and their labels
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/nuget-populate
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/d1e01440a32ce59524ea5067255fe513/nuget-populate.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/96ee1c5de173ef2098b824b133525b8a/nuget-populate-complete.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-build.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-configure.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-copyfile.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-download.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-install.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-mkdir.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-patch.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-test.rule
+C:/Users/Zero/Desktop/School stuff/Uni/8 Semestras/Bakalauro darbas/KnowledgeSwap/knowledgeswap/build/windows/x64/_deps/nuget-subbuild/CMakeFiles/fd4e0f3014695c19814e979598933337/nuget-populate-update.rule
