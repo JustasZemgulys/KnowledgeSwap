@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:knowledgeswap/web_storage.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'forgot_pass_ui.dart';
-import 'main_screen_ui.dart';
+import 'AppRouter.dart';
 import 'get_ip.dart';
 
 class LoginPage extends StatefulWidget {
@@ -21,7 +22,6 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> loginUser() async {
     if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-      // Display a pop-up message
       showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -29,24 +29,20 @@ class _LoginPageState extends State<LoginPage> {
             title: const Text("Please fill all fields"),
             actions: [
               TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
+                onPressed: () => Navigator.of(context).pop(),
                 child: const Text("OK"),
               ),
             ],
           );
         },
       );
-      return; // Stop further execution
+      return;
     }
 
-    String userIP = await getUserIP();
-    final apiUrl = 'http://$userIP/login.php';
-
     try {
+      String userIP = await getUserIP();
       final response = await http.post(
-        Uri.parse(apiUrl),
+        Uri.parse('http://$userIP/login.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': usernameController.text,
@@ -54,26 +50,26 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      print('Server Response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData['success']) {
-          // Login successful
-          print('Login successful');
-
           UserInfo userInfo = UserInfo.fromJson(responseData['userData']);
           UserInfoProvider userInfoProvider =
               Provider.of<UserInfoProvider>(context, listen: false);
-          userInfoProvider.setUserInfo(userInfo);
+          await userInfoProvider.setUserInfo(userInfo);
 
-          Navigator.push(
+          // Get last route or default to main screen
+          final lastRoute = await WebStorage.getLastRoute() ?? '/main';
+          
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const MainScreen()),
+            MaterialPageRoute(
+              builder: (context) => AppRouter.getScreenFromRoute(lastRoute),
+              settings: RouteSettings(name: lastRoute),
+            ),
+            (route) => false,
           );
         } else {
-          // Login failed
-          print('Login failed: ${responseData['message']}');
           showDialog(
             context: context,
             builder: (BuildContext context) {
@@ -81,24 +77,45 @@ class _LoginPageState extends State<LoginPage> {
                 title: const Text("Wrong username or password"),
                 actions: [
                   TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
+                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text("OK"),
                   ),
                 ],
               );
             },
           );
-          return; // Stop further execution
         }
       } else {
-        // Failed to connect to the server
-        print('Failed to connect to the server: ${response.statusCode}');
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("Server Error"),
+              content: Text("Status code: ${response.statusCode}"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("OK"),
+                ),
+              ],
+            );
+          },
+        );
       }
     } catch (e) {
-      // Exception occurred
-      print('Error: $e');
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
     }
   }
 

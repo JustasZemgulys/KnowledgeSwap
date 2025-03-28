@@ -127,7 +127,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(
-                      height: 20,
+                      height: 10,
                     ),
                     Center(
                       child: GestureDetector(
@@ -156,7 +156,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                       ),
                     ),
                     const SizedBox(
-                      height: 30,
+                      height: 10,
                     ),
                     Center(
                       child: Text(

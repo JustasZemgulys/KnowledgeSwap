@@ -20,7 +20,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _topicController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _parametersController = TextEditingController();
+  //final TextEditingController _amountController = TextEditingController();
   int _titleCharCount = 0;
   int _descriptionCharCount = 0;
   final int _maxTitleLength = 255;
@@ -41,11 +42,12 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<void> _fetchQuestionsFromAI() async {
     final String topic = _topicController.text;
-    final String amount = _amountController.text;
+    //final String amount = _amountController.text;
+    final String parameters = _parametersController.text;
 
-    if (topic.isEmpty || amount.isEmpty) {
+    if (topic.isEmpty){//|| amount.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter both topic and amount")),
+        SnackBar(content: Text("Please enter both topic")),
       );
       return;
     }
@@ -53,46 +55,139 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     String userIP = await getUserIP();
     final String url = 'http://$userIP/ai_create_question.php';
 
+    bool retry = false;
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        var responseData = await _sendRequest(url, topic, parameters);
+
+        if (responseData != null) {
+          bool success = _processResponse(responseData);
+          if (success) return; // Exit if successful
+          retry = true; // Retry if unsuccessful
+        } else {
+          retry = true; // Retry if response is null
+        }
+      } catch (e) {
+        print('Error: $e');
+        retry = true; // Retry if an exception occurs
+      }
+
+      if (!retry) break; // Exit the loop if no retry is needed
+    }
+
+    // Show an error message if all attempts fail
+    if (retry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Something went wrong. Please try again.")),
+      );
+    }
+  }
+
+  /// Sends a request to the server and returns the response data.
+  Future<Map<String, dynamic>?> _sendRequest(String url, String topic, String parameters) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse(url));
 
       // Add text fields
       request.fields['topic'] = topic;
-      request.fields['question_amount'] = amount;
+      request.fields['parameters'] = parameters;
 
       // Add file if selected
       if (_selectedFile != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
-            'file', // Field name for the file
-            _selectedFile!.bytes!, // Use the bytes property
-            filename: _selectedFile!.name, // File name
+            'file',
+            _selectedFile!.bytes!,
+            filename: _selectedFile!.name,
           ),
         );
       }
 
       var response = await request.send();
 
+      // Log status code and headers
+      print('Status Code: ${response.statusCode}');
+      print('Headers: ${response.headers}');
+
       if (response.statusCode == 200) {
         var responseData = await response.stream.bytesToString();
-        var jsonResponse = json.decode(responseData);
-        print('Server Response: ${response.statusCode}');
-        print('Body: $jsonResponse');
-        // Process the response and update the UI accordingly
+        print('Raw Response: $responseData'); // Log the raw response
+        return json.decode(responseData);
       } else {
         print('Server Response: ${response.statusCode}');
         var responseData = await response.stream.bytesToString();
         print('Body: $responseData');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to fetch questions: $responseData")),
-        );
+        return null;
       }
-    } catch (e) {
-      print('Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("An error occurred: $e")),
-      );
+    } catch (e, stackTrace) {
+      print("Error in _sendRequest: $e");
+      print("Stack Trace: $stackTrace");
+      return null;
     }
+  }
+
+  /// Processes the response and creates a question form if successful.
+  bool _processResponse(Map<String, dynamic> responseData) {
+    if (responseData['success'] == true) {
+      String content = responseData['full_response']['choices'][0]['message']['content'];
+
+      // Extract question, options, and answer
+      String question = _extractQuestion(content);
+      String options = _extractOptions(content);
+      String answer = _extractAnswer(content);
+
+      print('------------------------Start');
+      print('body: $responseData');
+      print('question: $question');
+      print('options: $options');
+      print('answer: $answer');
+      print('------------------------End');
+
+      if (options.isEmpty){
+          options = "";
+      }
+
+      // Check if question, options, and answer are valid
+      if (question.isNotEmpty && answer.isNotEmpty) {
+        // Create a new question form with the extracted data
+        setState(() {
+          _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1)
+            ..questionTitleController.text = question
+            ..questionDescriptionController.text = options
+            ..questionAnswerController.text = answer);
+        });
+        return true; // Success
+      }
+    }
+    return false; // Failure
+  }
+
+  /// Extracts the question from the response content.
+  String _extractQuestion(String content) {
+    RegExp questionRegex = RegExp(r'Question:\s*(.+)');
+    if (questionRegex.hasMatch(content)) {
+      return questionRegex.firstMatch(content)!.group(1)!.trim();
+    }
+    return '';
+  }
+
+  /// Extracts the options from the response content.
+  String _extractOptions(String content) {
+    RegExp optionsRegex = RegExp(r'Options:\s*([\s\S]+?)Answer:');
+    if (optionsRegex.hasMatch(content)) {
+      return optionsRegex.firstMatch(content)!.group(1)!.trim();
+    }
+    return '';
+  }
+
+  /// Extracts the answer from the response content.
+  String _extractAnswer(String content) {
+    RegExp answerRegex = RegExp(r'Answer:\s*(.+)');
+    if (answerRegex.hasMatch(content)) {
+      return answerRegex.firstMatch(content)!.group(1)!.trim();
+    }
+    return '';
   }
 
   Future<void> _pickFile() async {
@@ -124,27 +219,25 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     });
   }
 
-  // Method to add a new question form
   void _addQuestionForm() {
     setState(() {
-      _questionFormData.add(_QuestionFormData());
+      _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1));
     });
   }
 
   void _removeQuestionForm(int index) {
     setState(() {
       _questionFormData.removeAt(index);
-      _updateQuestionIndexes(); //update indexes
+      _updateQuestionIndexes(); // Update indexes
     });
   }
 
-  // Helper method to update question indexes after removing or moving
   void _updateQuestionIndexes() {
     for (int i = 0; i < _questionFormData.length; i++) {
       _questionFormData[i].index = i + 1;
     }
   }
-
+  
   void _moveQuestionUp(int index) {
     if (index > 0) {
       setState(() {
@@ -162,6 +255,69 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         _questionFormData.insert(index + 1, question);
         _updateQuestionIndexes();
       });
+    }
+  }
+
+  void _saveTest() async {
+    // Validate test name
+    if (_titleController.text.isEmpty) {
+      print("Error: Please enter a test title");
+      return;
+    }
+
+    // Validate at least one question
+    if (_questionFormData.isEmpty) {
+      print("Error: Please add at least one question");
+      return;
+    }
+
+    // Get user info
+    final userInfoProvider = Provider.of<UserInfoProvider>(context, listen: false);
+    final userInfo = userInfoProvider.userInfo;
+
+    if (userInfo == null) {
+      print("Error: User not logged in");
+      return;
+    }
+
+    // Prepare test data
+    final testData = {
+      'name': _titleController.text,
+      'description': _descriptionController.text,
+      'questions': _questionFormData.map((question) => {
+        'title': question.questionTitleController.text,
+        'description': question.questionDescriptionController.text,
+        'answer': question.questionAnswerController.text,
+      }).toList(),
+      'userId': userInfo.id,
+    };
+
+    // Send data to the server
+    final userIP = await getUserIP();
+    final url = 'http://$userIP/save_test.php';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(testData),
+      );
+
+      print("Response Status Code: ${response.statusCode}");
+      print("Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          print("Test saved successfully");
+        } else {
+          print("Error: ${responseData['message']}");
+        }
+      } else {
+        print("Failed to save test. Status code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error: $e");
     }
   }
 
@@ -245,11 +401,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
             ),
             const SizedBox(height: 20),
             TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
+              controller: _parametersController,
               decoration: InputDecoration(
-                labelText: "Number of Questions",
-                hintText: "Enter the number of questions",
+                labelText: "Parameters",
+                hintText: "Enter parameters for the question (e.g., 'multiple choice, difficulty: hard')",
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -276,6 +431,11 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
                     Text("${i + 1}. ${_questions[i]}"),
                 ],
               ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _saveTest,
+              child: const Text("Save Test"),
+            ),
           ],
         ),
       ),
@@ -293,9 +453,9 @@ class _QuestionFormData {
   final int maxQuestionTitleLength = 255;
   final int maxQuestionDescriptionLength = 255;
   final int maxQuestionAnswerLength = 255;
-  int index = 0; // New index
+  int index; // New index
 
-  _QuestionFormData() {
+  _QuestionFormData({required this.index}) {
     questionTitleController.addListener(() {
       questionTitleCharCount = questionTitleController.text.length;
     });

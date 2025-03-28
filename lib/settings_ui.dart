@@ -137,7 +137,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
   void disconnectUser() {
     // Clear user_info and navigate to WelcomeScreen
-    Provider.of<UserInfoProvider>(context, listen: false).setUserInfo(null);
+    Provider.of<UserInfoProvider>(context, listen: false).clearUserInfo;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const WelcomeScreen()),
@@ -187,7 +187,7 @@ class _SettingScreenState extends State<SettingScreen> {
         if (responseData['success']) {
           // Clear user_info and navigate to WelcomeScreen
           Provider.of<UserInfoProvider>(context, listen: false)
-              .setUserInfo(null);
+              .clearUserInfo();
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const WelcomeScreen()),

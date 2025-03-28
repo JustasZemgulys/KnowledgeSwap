@@ -143,7 +143,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               user_info = UserInfo.fromJson(registerData['userData']);
               UserInfoProvider userInfoProvider =
                   Provider.of<UserInfoProvider>(context, listen: false);
-              userInfoProvider.setUserInfo(user_info);
+              userInfoProvider.setUserInfo(user_info!);
               clearControllers();
               Navigator.push(
                 context,
