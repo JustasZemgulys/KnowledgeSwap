@@ -1,266 +1,316 @@
 <?php
-// Add this at the very top
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Modify headers to match working script
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json; charset=UTF-8");
 
-error_log("===== REQUEST RECEIVED =====");
+require 'vendor/autoload.php';
 
-// Database configuration
+$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
+
+// Database connection
 $servername = "localhost";
 $username = "root";
 $password = "";
 $dbname = "knowledgeswap";
 
-// Mistral API configuration
-$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
-$mistralUrl = "https://api.mistral.ai/v1/chat/completions";
+$conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) {
+    die(json_encode(['success' => false, 'message' => "Connection failed: " . $conn->connect_error]));
+}
 
-try {
-    // Get input data - MODIFIED to handle both content types
-    $input = file_get_contents('php://input');
-    error_log("Raw input: " . $input);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $data = json_decode(file_get_contents('php://input'), true);
     
-    $data = json_decode($input, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception("Invalid JSON input: " . json_last_error_msg());
-    }
-    
-    error_log("Decoded data: " . print_r($data, true));
+    $resourceId = $data['resourceId'] ?? 0;
+    $userId = $data['userId'] ?? 0;
+    $resourceName = $data['resourceName'] ?? '';
+    $questionsConfig = $data['questions'] ?? [];
 
-    $resourceId = $data['resource_id'] ?? 0;
-    $userId = $data['user_id'] ?? 0;
-    $resourceName = $data['resource_name'] ?? 'Resource';
-
-    // Validate input
     if ($resourceId <= 0 || $userId <= 0) {
-        throw new Exception("Invalid input parameters");
+        die(json_encode(['success' => false, 'message' => 'Invalid resource or user ID']));
     }
 
-    // Create database connection
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
+    // Get resource file content
+    $resourceQuery = $conn->prepare("SELECT resource_link FROM resource WHERE id = ?");
+    $resourceQuery->bind_param("i", $resourceId);
+    $resourceQuery->execute();
+    $resourceResult = $resourceQuery->get_result();
+    
+    if ($resourceResult->num_rows === 0) {
+        die(json_encode(['success' => false, 'message' => 'Resource not found']));
     }
-
-    // Get resource data
-    $resource = getResource($conn, $resourceId);
-    error_log("Resource data: " . print_r($resource, true));
     
-    // MODIFIED file path handling
-    $filePath = $_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($resource['resource_link'], '/');
-    error_log("Attempting to access file at: " . $filePath);
-    
-    if (!file_exists($filePath)) {
-        throw new Exception("File not found at: " . $filePath);
-    }
+    $resource = $resourceResult->fetch_assoc();
+    $resourcePath = $resource['resource_link'];
+    $extractedText = "";
 
-    $textContent = extractTextFromFile($filePath);
-    error_log("Extracted text length: " . strlen($textContent));
-    
-    // Generate test content
-    $questions = generateTestQuestions($textContent, $apiKey, $mistralUrl);
-    
-    // Save to database
-    $conn->autocommit(false);
-    $testId = saveTest($conn, $resourceName, $userId, $resourceId);
-    saveQuestions($conn, $questions, $testId);
-    $conn->commit();
-
-    echo json_encode([
-        'success' => true, 
-        'testId' => $testId,
-        'generatedQuestions' => count($questions)
-    ]);
-
-} catch (Exception $e) {
-    error_log("ERROR: " . $e->getMessage());
-    if (isset($conn)) {
-        $conn->rollback();
-    }
-    http_response_code(500);
-    echo json_encode([
-        'success' => false, 
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString()
-    ]);
-}
-
-// Database functions
-function getResource($conn, $resourceId) {
-    $stmt = $conn->prepare("SELECT resource_link FROM resource WHERE id = ?");
-    $stmt->bind_param("i", $resourceId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        throw new Exception("Resource not found");
-    }
-    return $result->fetch_assoc();
-}
-
-function saveTest($conn, $name, $userId, $resourceId) {
-    $stmt = $conn->prepare("INSERT INTO test (name, description, creation_date, fk_user, fk_resource) 
-        VALUES (?, 'Auto-generated test', NOW(), ?, ?)");
-    $stmt->bind_param("sii", $name, $userId, $resourceId);
-    
-    if (!$stmt->execute()) {
-        throw new Exception("Failed to save test: " . $conn->error);
-    }
-    return $conn->insert_id;
-}
-
-function saveQuestions($conn, $questions, $testId) {
-    $stmt = $conn->prepare("INSERT INTO question (name, description, answer, creation_date, fk_test) 
-        VALUES (?, ?, ?, NOW(), ?)");
-    
-    foreach ($questions as $q) {
-        $options = json_encode($q['options'] ?? []);
-        $stmt->bind_param("sssi", $q['text'], $options, $q['answer'], $testId);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to save question: " . $conn->error);
+    if (!empty($resourcePath)) {
+        $filePath = __DIR__ . '/' . ltrim($resourcePath, '/');
+        $fileType = mime_content_type($filePath);
+        $extractionResult = extractTextFromFile($filePath, $fileType);
+        if (!is_array($extractionResult)) {
+            $extractedText = $extractionResult;
         }
     }
-}
 
-// AI Generation functions
-function generateTestQuestions($textContent, $apiKey, $mistralUrl) {
+    // Generate questions based on configuration
     $questions = [];
-    $promptTemplates = [
-        "Generate a multiple choice question with 4 options about: $textContent",
-        "Create a true/false question based on: $textContent",
-        "Generate a short answer question regarding: $textContent",
-        "Create an essay question about: $textContent",
-        "Generate a fill-in-the-blank question using: $textContent"
-    ];
+    foreach ($questionsConfig as $config) {
+        $prompt = "Generate 1 question about {$config['topic']}";
+        $prompt .= " with parameters: {$config['parameters']}";
+        
+        if (!empty($extractedText)) {
+            $prompt .= " Use the following text as reference: $extractedText";
+        }
 
-    foreach ($promptTemplates as $prompt) {
-        $response = sendToMistral($prompt, $apiKey, $mistralUrl);
-        $questions[] = parseQuestion($response);
+        $question = generateQuestionFromPrompt($prompt);
+        if ($question) {
+            $questions[] = $question;
+        }
+        usleep(500000); // Rate limiting
     }
 
-    if (count($questions) < 5) {
-        throw new Exception("Failed to generate all questions");
+    if (count($questions) < 1) {
+        die(json_encode(['success' => false, 'message' => 'Failed to generate questions']));
     }
-    return $questions;
+    
+    // Create test
+    $testName = "Test: " . substr($resourceName, 0, 50);
+    $testDescription = "Generated test based on resource: " . $resourceName;
+    
+    $insertTestQuery = "INSERT INTO test (name, description, creation_date, visibility, fk_user, fk_resource) 
+                       VALUES (?, ?, NOW(), 1, ?, ?)";
+    $stmt = $conn->prepare($insertTestQuery);
+    $stmt->bind_param("ssii", $testName, $testDescription, $userId, $resourceId);
+    
+    if ($stmt->execute()) {
+        $testId = $conn->insert_id;
+        
+        // Insert questions
+        foreach ($questions as $q) {
+            $insertQuestionQuery = "INSERT INTO question (name, description, creation_date, visibility, answer, fk_user, fk_test) 
+                                   VALUES (?, ?, NOW(), 1, ?, ?, ?)";
+            $qStmt = $conn->prepare($insertQuestionQuery);
+            $qStmt->bind_param("sssii", $q['title'], $q['description'], $q['answer'], $userId, $testId);
+            $qStmt->execute();
+        }
+        
+        echo json_encode(['success' => true, 'testId' => $testId]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to save test']);
+    }
 }
 
-function sendToMistral($prompt, $apiKey, $mistralUrl) {
-    $ch = curl_init($mistralUrl);
-    curl_setopt_array($ch, [
-        CURLOPT_HTTPHEADER => [
-            "Authorization: Bearer $apiKey",
-            "Content-Type: application/json"
-        ],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode([
+function generateQuestionFromPrompt($prompt) {
+    global $apiKey;
+    
+    $prompt .= " Follow this exact format:
+
+Question: [The question text]
+
+**If multiple choice or true/false**, include:
+Options:
+A) [Option A]
+B) [Option B]
+C) [Option C]
+D) [Option D]
+Answer: [Correct answer letter and text, e.g. 'A) [Option A]']
+
+**Important Rules:**
+- For non-multiple-choice questions, only include Question and Answer
+- Never include example options for non-multiple-choice questions";
+
+    try {
+        $url = "https://api.mistral.ai/v1/chat/completions";
+        $inputData = [
             "model" => "mistral-tiny",
-            "messages" => [["role" => "user", "content" => $prompt]],
-            "temperature" => 0.7,
-            "max_tokens" => 500
-        ]),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30
-    ]);
+            "messages" => [
+                [
+                    "role" => "user",
+                    "content" => $prompt
+                ]
+            ],
+            "max_tokens" => 500,
+            "temperature" => 0.7
+        ];
 
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        throw new Exception("AI API error: " . curl_error($ch));
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $apiKey",
+                "Content-Type: application/json"
+            ],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($inputData),
+            CURLOPT_TIMEOUT => 30
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if ($httpCode !== 200) {
+            error_log("API error: " . $response);
+            return null;
+        }
+
+        $responseData = json_decode($response, true);
+        $content = $responseData['choices'][0]['message']['content'] ?? '';
+
+        // Parse the response
+        $question = [
+            'title' => '',
+            'description' => '',
+            'answer' => ''
+        ];
+
+        // Extract question
+        if (preg_match('/Question:\s*(.+)/', $content, $matches)) {
+            $question['title'] = trim($matches[1]);
+        }
+
+        // Extract options (if any)
+        if (preg_match('/Options:\s*([\s\S]+?)Answer:/', $content, $matches)) {
+            $question['description'] = trim($matches[1]);
+        }
+
+        // Extract answer
+        if (preg_match('/Answer:\s*(.+)/', $content, $matches)) {
+            $question['answer'] = trim($matches[1]);
+        }
+
+        return $question;
+    } catch (Exception $e) {
+        error_log("Error generating question: " . $e->getMessage());
+        return null;
+    } finally {
+        if (isset($ch)) curl_close($ch);
     }
-
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if ($httpCode !== 200) {
-        throw new Exception("AI API returned status: $httpCode");
-    }
-
-    return json_decode($response, true);
 }
 
-function parseQuestion($response) {
-    if (!isset($response['choices'][0]['message']['content'])) {
-        throw new Exception("Invalid AI response format");
+function generateQuestion($topic, $parameters, $referenceText = "") {
+    global $apiKey;
+    
+    $prompt = "Generate 1 question about $topic";
+    $prompt .= " based on following parameters: $parameters";
+    $prompt .= ".";
+    
+    if (!empty($referenceText)) {
+        $prompt .= " Use the following text as a reference: $referenceText";
     }
 
-    $content = $response['choices'][0]['message']['content'];
-    $question = [
-        'text' => '',
-        'options' => [],
-        'answer' => ''
-    ];
+    $prompt .= " Follow this exact format:
 
-    // Extract question
-    if (preg_match('/Question:\s*(.+?)(\n|$)/s', $content, $matches)) {
-        $question['text'] = trim($matches[1]);
+Question: [The question text]
+
+**If and ONLY if the question type is multiple choice or true or false **, include:
+Options:
+A) [Option A]
+B) [Option B]
+**Use 2 options, for true or false questions, more for multiple choice questions, eg**
+C) [Option C]
+D) [Option D]
+Answer: [The correct answer. If the question is multiple choice, format the answer as 'A) [Option A]'. Otherwise, provide a direct answer as 'Answer'.]
+**Important Rules:**
+- Do NOT include the Options section for open-ended, fill-in-the-blank, or other non-multiple-choice questions.
+- Never include example options (e.g., commented-out options) for non-multiple-choice questions
+";
+
+    try {
+        $url = "https://api.mistral.ai/v1/chat/completions";
+        $inputData = [
+            "model" => "mistral-tiny",
+            "messages" => [
+                [
+                    "role" => "user",
+                    "content" => $prompt
+                ]
+            ],
+            "max_tokens" => 500,
+            "temperature" => 0.7
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $apiKey",
+                "Content-Type: application/json"
+            ],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($inputData),
+            CURLOPT_TIMEOUT => 30
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if ($httpCode !== 200) {
+            error_log("API error: " . $response);
+            return null;
+        }
+
+        $responseData = json_decode($response, true);
+        $content = $responseData['choices'][0]['message']['content'] ?? '';
+
+        // Parse the response
+        $question = [
+            'title' => '',
+            'description' => '',
+            'answer' => ''
+        ];
+
+        // Extract question
+        if (preg_match('/Question:\s*(.+)/', $content, $matches)) {
+            $question['title'] = trim($matches[1]);
+        }
+
+        // Extract options (if any)
+        if (preg_match('/Options:\s*([\s\S]+?)Answer:/', $content, $matches)) {
+            $question['description'] = trim($matches[1]);
+        }
+
+        // Extract answer
+        if (preg_match('/Answer:\s*(.+)/', $content, $matches)) {
+            $question['answer'] = trim($matches[1]);
+        }
+
+        return $question;
+    } catch (Exception $e) {
+        error_log("Error generating question: " . $e->getMessage());
+        return null;
+    } finally {
+        if (isset($ch)) curl_close($ch);
     }
-
-    // Extract options
-    if (preg_match('/Options:\s*([\s\S]+?)Answer:/', $content, $matches)) {
-        $question['options'] = array_map('trim', explode("\n", trim($matches[1])));
-    }
-
-    // Extract answer
-    if (preg_match('/Answer:\s*(.+)/', $content, $matches)) {
-        $question['answer'] = trim($matches[1]);
-    }
-
-    if (empty($question['text']) || empty($question['answer'])) {
-        throw new Exception("Failed to parse valid question from AI response");
-    }
-
-    return $question;
 }
 
-/**
- * Extracts text from a file (PDF or image).
- */
 function extractTextFromFile($filePath, $fileType) {
     $extractedText = "";
 
-    // Use finfo to detect the MIME type
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $detectedMimeType = finfo_file($finfo, $filePath);
-    finfo_close($finfo);
-
-    // Override the provided $fileType with the detected MIME type
-    $fileType = $detectedMimeType;
-
-    error_log("Detected MIME type: $fileType");
-
     try {
-        // Verify file exists
         if (!file_exists($filePath)) {
             throw new Exception("File not found: $filePath");
         }
 
         // PDF handling
         if ($fileType === 'application/pdf') {
-            error_log("Parsing PDF file: $filePath");
             $parser = new \Smalot\PdfParser\Parser();
             $pdf = $parser->parseFile($filePath);
             $extractedText = $pdf->getText();
 
             if (empty($extractedText)) {
-                throw new Exception("PDF parsing returned empty text. The PDF might be image-based or contain no extractable text.");
+                throw new Exception("PDF parsing returned empty text");
             }
-
-            error_log("PDF text extracted successfully");
         }
         // Image handling
         elseif (in_array($fileType, ['image/jpeg', 'image/png', 'image/jpg'])) {
-            error_log("Processing image file: $filePath");
             $outputFile = tempnam(sys_get_temp_dir(), 'ocr_output');
-
-            // Use full path to Tesseract
-            $tesseractPath = '"C:\\Program Files\\Tesseract-OCR\\tesseract"'; // Windows
-            // $tesseractPath = '/usr/bin/tesseract'; // Linux/macOS
-
+            $tesseractPath = '"C:\\Program Files\\Tesseract-OCR\\tesseract"';
             $cmd = "$tesseractPath " . escapeshellarg($filePath) . " " . escapeshellarg($outputFile) . " 2>&1";
             exec($cmd, $output, $returnCode);
 

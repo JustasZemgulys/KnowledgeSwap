@@ -66,6 +66,7 @@ try {
             'has_resource' => !empty($row['fk_resource']),
             'question_count' => (int)$row['question_count'],
             'is_owner' => ($row['fk_user'] == $userId),
+			'fk_user' => $row['fk_user'],
             'visibility' => (bool)$row['visibility']
         ];
     }

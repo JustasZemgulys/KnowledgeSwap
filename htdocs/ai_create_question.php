@@ -8,9 +8,9 @@ header("Access-Control-Allow-Methods: GET, POST");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json; charset=UTF-8");
 
-require 'vendor/autoload.php';
+require 'vendor/autoload.php'; // Ensure Composer autoload is included
 
-$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
+$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ"; // Your Mistral API key
 
 // Get fields from POST data
 $topic = $_POST['topic'] ?? '';
@@ -25,6 +25,7 @@ if (empty($topic) || empty($parameters)) {
     exit;
 }
 
+// Handle file upload
 $extractedText = "";
 if (isset($_FILES['file'])) {
     error_log("File uploaded: " . print_r($_FILES['file'], true));
@@ -58,6 +59,7 @@ if (!empty($extractedText)) {
     $prompt .= " Use the following text as a reference: $extractedText";
 }
 
+// Add format instructions
 $prompt .= " Follow this exact format:
 
 Question: [The question text]

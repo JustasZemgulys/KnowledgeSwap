@@ -31,7 +31,8 @@ try {
             description,
             creation_date,
             resource_photo_link,
-			resource_link
+			resource_link,
+			fk_user
         FROM resource
         ORDER BY creation_date $sort
         LIMIT ?, ?
@@ -45,7 +46,7 @@ try {
     while ($row = $result->fetch_assoc()) {
         if (!empty($row['resource_photo_link'])) {
             $filename = basename($row['resource_photo_link']);
-            $iconDir = $_SERVER['DOCUMENT_ROOT'] . '/knowledshare/icons/';
+            $iconDir = $_SERVER['DOCUMENT_ROOT'] . '/knowledgeswap/icons/';
 
             $found = null;
             foreach (glob($iconDir . '*', GLOB_NOSORT) as $file) {
@@ -56,7 +57,7 @@ try {
             }
 
             $row['resource_photo_link'] = $found
-                ? 'knowledshare/icons/' . $found
+                ? 'knowledgeswap/icons/' . $found
                 : null;
         }
         $resources[] = $row;

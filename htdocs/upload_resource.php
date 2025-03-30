@@ -39,8 +39,8 @@ try {
     $iconFile = $_FILES['icon_file'] ?? null;
 
     // Create directories if they don't exist
-		$resourceDir = "knowledshare/resources/";
-		$iconDir = "knowledshare/icons/";
+		$resourceDir = "knowledgeswap/resources/";
+		$iconDir = "knowledgeswap/icons/";
 
 		// Create resource directory if it doesn't exist
 		if (!file_exists($resourceDir)) {
