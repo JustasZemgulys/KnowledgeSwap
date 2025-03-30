@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/create_test_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
@@ -253,7 +254,12 @@ class _TestScreenState extends State<TestScreen> {
                     ],
                     onSelected: (value) async {
                       if (value == 'edit') {
-                        // TODO: Implement edit functionality
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditTestScreen(test: test),
+                          ),
+                        ).then((_) => _fetchTests());
                       } else if (value == 'delete') {
                         _confirmDeleteTest(context, testId, testName);
                       }

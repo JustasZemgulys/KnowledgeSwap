@@ -9,11 +9,14 @@ import 'get_ip.dart';
 import 'package:file_picker/file_picker.dart';
 
 class CreateTestScreen extends StatefulWidget {
-  const CreateTestScreen({super.key});
+  final Map<String, dynamic>? initialTestData;
+
+  const CreateTestScreen({super.key, this.initialTestData});
 
   @override
   State<CreateTestScreen> createState() => _CreateTestScreenState();
 }
+
 
 class _CreateTestScreenState extends State<CreateTestScreen> {
   late UserInfo user_info;
@@ -38,16 +41,54 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     _titleController.addListener(_updateTitleCharCount);
     _descriptionController.addListener(_updateDescriptionCharCount);
+
+    // Load existing test data if editing
+    if (widget.initialTestData != null) {
+      _titleController.text = widget.initialTestData!['name'] ?? '';
+      _descriptionController.text = widget.initialTestData!['description'] ?? '';
+      _loadExistingQuestions();
+    }
+  }
+
+  Future<void> _loadExistingQuestions() async {
+    if (widget.initialTestData == null) return;
+
+    try {
+      final userIP = await getUserIP();
+      final url = 'http://$userIP/get_questions.php?test_id=${widget.initialTestData!['id']}';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final List<dynamic> questions = responseData['questions'] ?? [];
+          
+          // Sort questions by their index before creating form data
+          questions.sort((a, b) => (a['index'] ?? 0).compareTo(b['index'] ?? 0));
+          
+          setState(() {
+            _questionFormData = questions.map((q) {
+              return _QuestionFormData(index: q['index'] ?? (_questionFormData.length + 1))
+                ..questionId = q['id']
+                ..questionTitleController.text = q['name'] ?? ''
+                ..questionDescriptionController.text = q['description'] ?? ''
+                ..questionAnswerController.text = q['answer'] ?? '';
+            }).toList();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading questions: $e');
+    }
   }
 
   Future<void> _fetchQuestionsFromAI() async {
     final String topic = _topicController.text;
-    //final String amount = _amountController.text;
     final String parameters = _parametersController.text;
 
-    if (topic.isEmpty){//|| amount.isEmpty) {
+    if (topic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter both topic")),
+        SnackBar(content: Text("Please enter a topic")),
       );
       return;
     }
@@ -137,30 +178,24 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       String options = _extractOptions(content);
       String answer = _extractAnswer(content);
 
-      print('------------------------Start');
-      print('body: $responseData');
-      print('question: $question');
-      print('options: $options');
-      print('answer: $answer');
-      print('------------------------End');
-
-      if (options.isEmpty){
-          options = "";
+      // Validate extracted data
+      if (question.isEmpty || answer.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to generate valid question - missing title or answer")),
+        );
+        return false;
       }
 
-      // Check if question, options, and answer are valid
-      if (question.isNotEmpty && answer.isNotEmpty) {
-        // Create a new question form with the extracted data
-        setState(() {
-          _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1)
-            ..questionTitleController.text = question
-            ..questionDescriptionController.text = options
-            ..questionAnswerController.text = answer);
-        });
-        return true; // Success
-      }
+      // Create a new question form with the extracted data
+      setState(() {
+        _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1)
+          ..questionTitleController.text = question
+          ..questionDescriptionController.text = options
+          ..questionAnswerController.text = answer);
+      });
+      return true;
     }
-    return false; // Failure
+    return false;
   }
 
   /// Extracts the question from the response content.
@@ -232,100 +267,142 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     });
   }
 
-  void _updateQuestionIndexes() {
-    for (int i = 0; i < _questionFormData.length; i++) {
-      _questionFormData[i].index = i + 1;
-    }
-  }
-  
   void _moveQuestionUp(int index) {
-    if (index > 0) {
-      setState(() {
-        final question = _questionFormData.removeAt(index);
-        _questionFormData.insert(index - 1, question);
-        _updateQuestionIndexes();
-      });
-    }
+  if (index > 0) {
+    setState(() {
+      final question = _questionFormData.removeAt(index);
+      _questionFormData.insert(index - 1, question);
+      _updateQuestionIndexes();
+    });
+  }
+}
+
+void _moveQuestionDown(int index) {
+  if (index < _questionFormData.length - 1) {
+    setState(() {
+      final question = _questionFormData.removeAt(index);
+      _questionFormData.insert(index + 1, question);
+      _updateQuestionIndexes();
+    });
+  }
+}
+
+void _updateQuestionIndexes() {
+  for (int i = 0; i < _questionFormData.length; i++) {
+    _questionFormData[i].index = i + 1; // Update to 1-based index
+  }
+}
+
+void _saveTest() async {
+  // Validate test name
+  if (_titleController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Please enter a test title")),
+    );
+    return;
   }
 
-  void _moveQuestionDown(int index) {
-    if (index < _questionFormData.length - 1) {
-      setState(() {
-        final question = _questionFormData.removeAt(index);
-        _questionFormData.insert(index + 1, question);
-        _updateQuestionIndexes();
-      });
-    }
+  // Validate at least one question
+  if (_questionFormData.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Please add at least one question")),
+    );
+    return;
   }
 
-  void _saveTest() async {
-    // Validate test name
-    if (_titleController.text.isEmpty) {
-      print("Error: Please enter a test title");
-      return;
-    }
-
-    // Validate at least one question
-    if (_questionFormData.isEmpty) {
-      print("Error: Please add at least one question");
-      return;
-    }
-
-    // Get user info
-    final userInfoProvider = Provider.of<UserInfoProvider>(context, listen: false);
-    final userInfo = userInfoProvider.userInfo;
-
-    if (userInfo == null) {
-      print("Error: User not logged in");
-      return;
-    }
-
-    // Prepare test data
-    final testData = {
-      'name': _titleController.text,
-      'description': _descriptionController.text,
-      'questions': _questionFormData.map((question) => {
-        'title': question.questionTitleController.text,
-        'description': question.questionDescriptionController.text,
-        'answer': question.questionAnswerController.text,
-      }).toList(),
-      'userId': userInfo.id,
-    };
-
-    // Send data to the server
-    final userIP = await getUserIP();
-    final url = 'http://$userIP/save_test.php';
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(testData),
+  // Validate each question has title and answer
+  for (int i = 0; i < _questionFormData.length; i++) {
+    final question = _questionFormData[i];
+    if (question.questionTitleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Question ${i + 1} is missing a title")),
       );
-
-      print("Response Status Code: ${response.statusCode}");
-      print("Response Body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          print("Test saved successfully");
-        } else {
-          print("Error: ${responseData['message']}");
-        }
-      } else {
-        print("Failed to save test. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      print("Error: $e");
+      return;
     }
+    if (question.questionAnswerController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Question ${i + 1} is missing an answer")),
+      );
+      return;
+    }
+  }
+
+  // Get user info
+  final userInfoProvider = Provider.of<UserInfoProvider>(context, listen: false);
+  final userInfo = userInfoProvider.userInfo;
+
+  if (userInfo == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("User not logged in")),
+    );
+    return;
+  }
+
+  // Prepare test data
+  final testData = {
+    'name': _titleController.text,
+    'description': _descriptionController.text,
+    'questions': _questionFormData.map((question) => {
+      'title': question.questionTitleController.text,
+      'description': question.questionDescriptionController.text,
+      'answer': question.questionAnswerController.text,
+      'index': question.index,
+      'id': question.questionId, // Include question ID if editing
+    }).toList(),
+    'userId': userInfo.id,
+  };
+
+  // If editing, include test ID
+  if (widget.initialTestData != null) {
+    testData['testId'] = widget.initialTestData!['id'];
+  }
+
+  // Send data to the server
+  final userIP = await getUserIP();
+  final url = widget.initialTestData != null 
+      ? 'http://$userIP/update_test.php'
+      : 'http://$userIP/save_test.php';
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(testData),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.initialTestData != null 
+              ? "Test updated successfully" 
+              : "Test saved successfully")),
+        );
+        Navigator.pop(context, true);
+      } else {
+        print('Operation failed: $responseData');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? "Operation failed")),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to save test. Status code: ${response.statusCode}")),
+      );
+    }
+  } catch (e) {
+    print('Error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Error: $e")),
+    );
+  }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Test Creation"),
+        title: Text(widget.initialTestData != null ? "Edit Test" : "Test Creation"),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           const SizedBox(width: 1),
@@ -453,9 +530,10 @@ class _QuestionFormData {
   final int maxQuestionTitleLength = 255;
   final int maxQuestionDescriptionLength = 255;
   final int maxQuestionAnswerLength = 255;
-  int index; // New index
+  int index; // This will track the question order
+  int? questionId; // Add this to track existing question IDs
 
-  _QuestionFormData({required this.index}) {
+  _QuestionFormData({required this.index, this.questionId}) {
     questionTitleController.addListener(() {
       questionTitleCharCount = questionTitleController.text.length;
     });
@@ -474,100 +552,147 @@ class _QuestionForm extends StatefulWidget {
   final VoidCallback onMoveDown;
   final _QuestionFormData questionFormData;
 
-  const _QuestionForm(
-      {required this.questionFormData,
-      required this.onRemove,
-      required this.onMoveUp,
-      required this.onMoveDown,
-      Key? key})
-      : super(key: key);
+  const _QuestionForm({
+    required this.questionFormData,
+    required this.onRemove,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<_QuestionForm> createState() => _QuestionFormState();
 }
 
 class _QuestionFormState extends State<_QuestionForm> {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
+  bool _isExpanded = true;
 
   @override
   Widget build(BuildContext context) {
+    final question = widget.questionFormData;
+    final hasTitleError = question.questionTitleController.text.isEmpty;
+    final hasAnswerError = question.questionAnswerController.text.isEmpty;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 20), // Add spacing between forms
+      margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey), // Add the outline
+        border: Border.all(
+          color: (hasTitleError || hasAnswerError) ? Colors.red : Colors.grey,
+          width: (hasTitleError || hasAnswerError) ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Column(
         children: [
+          // Header row with question number and action buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Question ${widget.questionFormData.index}"),
+              // Show number only when expanded, number + title when compressed
+              _isExpanded
+                  ? Text("Question ${question.index}")
+                  : Expanded(
+                      child: Row(
+                        children: [
+                          Text("Question ${question.index}: "),
+                          Expanded(
+                            child: Text(
+                              question.questionTitleController.text.isEmpty
+                                  ? "Untitled question"
+                                  : question.questionTitleController.text,
+                              style: TextStyle(
+                                fontStyle: question.questionTitleController.text.isEmpty
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
               Row(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_upward),
                     onPressed: widget.onMoveUp,
+                    tooltip: 'Move up',
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward),
                     onPressed: widget.onMoveDown,
+                    tooltip: 'Move down',
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete),
                     onPressed: widget.onRemove,
+                    tooltip: 'Delete question',
+                  ),
+                  IconButton(
+                    icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                    onPressed: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                    },
+                    tooltip: _isExpanded ? 'Collapse question' : 'Expand question',
                   ),
                 ],
-              )
+              ),
             ],
           ),
-          TextField(
-            controller: widget.questionFormData.questionTitleController,
-            maxLength: widget.questionFormData.maxQuestionTitleLength,
-            decoration: InputDecoration(
-              labelText: "Question Title",
-              hintText: "Enter the question title here",
-              border: const OutlineInputBorder(),
-              counterText:
-                  "${widget.questionFormData.questionTitleCharCount}/${widget.questionFormData.maxQuestionTitleLength}",
-              counterStyle: const TextStyle(fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: widget.questionFormData.questionDescriptionController,
-            maxLength: widget.questionFormData.maxQuestionDescriptionLength,
-            maxLines: 5,
-            decoration: InputDecoration(
-              labelText: "Question Description",
-              hintText: "Enter the question description here",
-              border: const OutlineInputBorder(),
-              counterText:
-                  "${widget.questionFormData.questionDescriptionCharCount}/${widget.questionFormData.maxQuestionDescriptionLength}",
-              counterStyle: const TextStyle(fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: widget.questionFormData.questionAnswerController,
-            maxLength: widget.questionFormData.maxQuestionAnswerLength,
-            decoration: InputDecoration(
-              labelText: "Answer",
-              hintText: "Enter the answer here",
-              border: const OutlineInputBorder(),
-              counterText:
-                  "${widget.questionFormData.questionAnswerCharCount}/${widget.questionFormData.maxQuestionAnswerLength}",
-              counterStyle: const TextStyle(fontSize: 12),
-            ),
+          // The question content that can be collapsed
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            child: _isExpanded
+                ? Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: question.questionTitleController,
+                        maxLength: question.maxQuestionTitleLength,
+                        decoration: InputDecoration(
+                          labelText: "Question Title*",
+                          hintText: "Enter the question title here",
+                          border: const OutlineInputBorder(),
+                          errorText: hasTitleError ? "Title is required" : null,
+                          counterText:
+                              "${question.questionTitleCharCount}/${question.maxQuestionTitleLength}",
+                          counterStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: question.questionDescriptionController,
+                        maxLength: question.maxQuestionDescriptionLength,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          labelText: "Question Description",
+                          hintText: "Enter the question description here",
+                          border: const OutlineInputBorder(),
+                          counterText:
+                              "${question.questionDescriptionCharCount}/${question.maxQuestionDescriptionLength}",
+                          counterStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: question.questionAnswerController,
+                        maxLength: question.maxQuestionAnswerLength,
+                        decoration: InputDecoration(
+                          labelText: "Answer*",
+                          hintText: "Enter the answer here",
+                          border: const OutlineInputBorder(),
+                          errorText: hasAnswerError ? "Answer is required" : null,
+                          counterText:
+                              "${question.questionAnswerCharCount}/${question.maxQuestionAnswerLength}",
+                          counterStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(), // No extra content when compressed
           ),
         ],
       ),

@@ -37,7 +37,6 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
       await _fetchTestDetails();
       await _fetchQuestions();
     } catch (e) {
-      //print('Error initializing server IP: $e');
       _showError('Connection error: $e');
     }
   }
@@ -63,13 +62,21 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          questions = List<dynamic>.from(data['questions']);
-          isLoading = false;
-        });
+        if (data['success'] == true) {
+          // Sort questions by their index before displaying
+          List<dynamic> loadedQuestions = List<dynamic>.from(data['questions']);
+          loadedQuestions.sort((a, b) => (a['index'] ?? 0).compareTo(b['index'] ?? 0));
+          
+          setState(() {
+            questions = loadedQuestions;
+            isLoading = false;
+          });
+        } else {
+          _showError(data['message'] ?? 'Failed to load questions');
+        }
       }
     } catch (e) {
-      _showError('Failed to load questions');
+      _showError('Failed to load questions: $e');
     }
   }
 
@@ -81,6 +88,8 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
 
   Widget _buildQuestionCard(int index) {
     final question = questions[index];
+    final questionNumber = question['index'] ?? index + 1;
+    
     return Card(
       margin: const EdgeInsets.all(8),
       child: Padding(
@@ -88,9 +97,13 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Question ${index + 1}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            Row(
+              children: [
+                Text(
+                  'Question $questionNumber',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(question['name'] ?? ''),
@@ -119,7 +132,6 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
 
   void _submitTest() async {
     setState(() => isSubmitted = true);
-    // Here you would typically send the answers to your backend
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -180,6 +192,8 @@ class ReviewScreen extends StatelessWidget {
 
   Widget _buildReviewQuestion(int index) {
     final question = questions[index];
+    final questionNumber = question['index'] ?? index + 1;
+    
     return Card(
       margin: const EdgeInsets.all(8),
       child: Padding(
@@ -187,9 +201,13 @@ class ReviewScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Question ${index + 1}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Text(
+                  'Question $questionNumber',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(question['name'] ?? ''),

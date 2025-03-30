@@ -40,32 +40,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die(json_encode(['success' => false, 'message' => 'Missing or invalid required fields']));
     }
 
-    // Insert test data into the database
-    $insertTestQuery = "INSERT INTO test (name, description, creation_date, visibility, fk_user, fk_resource) VALUES ('$name', '$description', NOW(), 1, $userId, NULL)";
-	
-    if ($conn->query($insertTestQuery)) {
+    // Start transaction
+    $conn->begin_transaction();
+
+    try {
+        // Insert test data into the database
+        $insertTestQuery = "INSERT INTO test (name, description, creation_date, visibility, fk_user, fk_resource) 
+                          VALUES (?, ?, NOW(), 1, ?, NULL)";
+        
+        $stmt = $conn->prepare($insertTestQuery);
+        $stmt->bind_param("ssi", $name, $description, $userId);
+        $stmt->execute();
+        
         $testId = $conn->insert_id; // Get the ID of the newly inserted test
+        $stmt->close();
 
         // Insert questions into the database
         foreach ($questions as $question) {
             $title = $question['title'] ?? '';
             $description = $question['description'] ?? '';
             $answer = $question['answer'] ?? '';
+            $index = $question['index'] ?? 0; // Get the index, default to 0 if not provided
 
-            if (empty($title) || empty($description) || empty($answer)) {
+            if (empty($title) || empty($answer)) {
                 error_log("Invalid question data: " . print_r($question, true));
                 continue; // Skip invalid questions
             }
 
-            $insertQuestionQuery = "INSERT INTO question (name, description, creation_date, visibility, answer, fk_user, fk_test) VALUES ('$title', '$description', NOW(), 1, '$answer', $userId, $testId)";
-            if (!$conn->query($insertQuestionQuery)) {
-                error_log("Error inserting question: " . $conn->error);
+            $insertQuestionQuery = "INSERT INTO question 
+                                  (name, description, creation_date, visibility, answer, `index`, fk_user, fk_test) 
+                                  VALUES (?, ?, NOW(), 1, ?, ?, ?, ?)";
+            
+            $stmt = $conn->prepare($insertQuestionQuery);
+            $stmt->bind_param("sssiis", 
+                $title, 
+                $description, 
+                $answer, 
+                $index, 
+                $userId, 
+                $testId);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Error inserting question: " . $conn->error);
             }
+            $stmt->close();
         }
 
+        // Commit transaction
+        $conn->commit();
         $response = ['success' => true, 'message' => 'Test and questions saved successfully'];
-    } else {
-        $response = ['success' => false, 'message' => 'Error saving test: ' . $conn->error];
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        $conn->rollback();
+        $response = ['success' => false, 'message' => 'Error saving test: ' . $e->getMessage()];
     }
 
     echo json_encode($response);

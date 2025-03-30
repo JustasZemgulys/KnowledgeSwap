@@ -17,9 +17,10 @@ try {
         $testId = $_GET['test_id'];
         
         $stmt = $pdo->prepare("
-            SELECT id, name, description, answer
+            SELECT id, name, description, answer, `index`
             FROM question 
             WHERE fk_test = ?
+            ORDER BY `index` ASC
         ");
         $stmt->execute([$testId]);
         $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -36,3 +37,4 @@ try {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
+?>
