@@ -14,7 +14,9 @@ import 'get_ip.dart';
 import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 
 class CreateResourceScreen extends StatefulWidget {
-  const CreateResourceScreen({super.key});
+  final Map<String, dynamic>? initialData;
+
+  const CreateResourceScreen({super.key, this.initialData});
 
   @override
   State<CreateResourceScreen> createState() => _CreateResourceScreenState();
@@ -44,9 +46,156 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   void initState() {
     super.initState();
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+    
+    // Initialize with existing data if editing
+    if (widget.initialData != null) {
+      _resourceNameController.text = widget.initialData!['name'] ?? '';
+      _resourceDescriptionController.text = widget.initialData!['description'] ?? '';
+      _isPrivate = widget.initialData!['visibility'] != 1;
+    }
+    
     _resourceNameController.addListener(_updateResourceNameCharCount);
     _resourceDescriptionController.addListener(_updateResourceDescriptionCharCount);
   }
+
+  Future<void> _uploadResource() async {
+  if (_resourceNameController.text.isEmpty) {
+    _showErrorSnackBar('Please enter a resource name');
+    return;
+  }
+
+  if (widget.initialData == null && (_selectedFile == null || _fileBytes == null)) {
+    _showErrorSnackBar('Please select a resource file to upload');
+    return;
+  }
+
+  if (_selectedFile != null && !['pdf', 'jpg', 'jpeg', 'png'].contains(_fileType)) {
+    _showErrorSnackBar('Only PDF, JPG, and PNG files are allowed for resources');
+    return;
+  }
+
+  if (_iconBytes != null && !['jpg', 'jpeg', 'png'].contains(_iconType)) {
+    _showErrorSnackBar('Only JPG and PNG files are allowed for icons');
+    return;
+  }
+
+  setState(() {
+    _isUploading = true;
+  });
+
+  try {
+    if (widget.initialData != null) {
+      await _updateResource();
+    } else {
+      await _createResource();
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+}
+
+Future<void> _createResource() async {
+  try {
+    final userIP = await getUserIP();
+    final url = Uri.parse('http://$userIP/upload_resource.php');
+
+    var request = http.MultipartRequest('POST', url)
+      ..fields['name'] = _resourceNameController.text
+      ..fields['description'] = _resourceDescriptionController.text
+      ..fields['visibility'] = _isPrivate ? '0' : '1'
+      ..fields['fk_user'] = user_info.id.toString();
+
+    request.files.add(http.MultipartFile.fromBytes(
+      'resource_file',
+      _fileBytes!,
+      filename: _fileName,
+    ));
+
+    if (_iconBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'icon_file',
+        _iconBytes!,
+        filename: _iconName,
+      ));
+    }
+
+    final response = await request.send().timeout(const Duration(seconds: 30));
+    final responseData = await response.stream.bytesToString();
+    final decodedResponse = jsonDecode(responseData);
+
+    if (response.statusCode == 200) {
+      if (decodedResponse['success'] == true) {
+        _showSuccessMessage('Resource uploaded successfully!');
+        _resetForm();
+      } else {
+        _showErrorSnackBar('Error: ${decodedResponse['message']}');
+      }
+    } else {
+      _showErrorSnackBar('Upload failed: ${decodedResponse['message'] ?? 'Server error'}');
+    }
+  } on SocketException {
+    _showErrorSnackBar('Network error: Please check your connection');
+  } on TimeoutException {
+    _showErrorSnackBar('Request timed out. Please try again');
+  } catch (e) {
+    _showErrorSnackBar('Error uploading: $e');
+  }
+}
+
+Future<void> _updateResource() async {
+  try {
+    final userIP = await getUserIP();
+    final url = Uri.parse('http://$userIP/update_resource.php');
+
+    var request = http.MultipartRequest('POST', url)
+      ..fields['resource_id'] = widget.initialData!['id'].toString()
+      ..fields['name'] = _resourceNameController.text
+      ..fields['description'] = _resourceDescriptionController.text
+      ..fields['visibility'] = _isPrivate ? '0' : '1';
+
+    // Add resource file if changed
+    if (_fileBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'resource_file',
+        _fileBytes!,
+        filename: _fileName,
+      ));
+    }
+
+    // Add icon file if changed
+    if (_iconBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'icon_file',
+        _iconBytes!,
+        filename: _iconName,
+      ));
+    }
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(responseBody);
+      if (jsonResponse['success'] == true) {
+        Navigator.pop(context, true);
+      } else {
+        _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
+      }
+    } else {
+      _showErrorSnackBar('Server error: ${response.statusCode}');
+    }
+  } on SocketException {
+    _showErrorSnackBar('Network error - check connection');
+  } on TimeoutException {
+    _showErrorSnackBar('Request timed out');
+  } catch (e) {
+    _showErrorSnackBar('Error: ${e.toString()}');
+  }
+}
 
   @override
   void dispose() {
@@ -176,90 +325,6 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _uploadResource() async {
-
-    if (_resourceNameController.text.isEmpty) {
-      _showErrorSnackBar('Please enter a resource name');
-      return;
-    }
-
-    if (_selectedFile == null || _fileBytes == null) {
-      _showErrorSnackBar('Please select a resource file to upload');
-      return;
-    }
-
-    if (!['pdf', 'jpg', 'jpeg', 'png'].contains(_fileType)) {
-      _showErrorSnackBar('Only PDF, JPG, and PNG files are allowed for resources');
-      return;
-    }
-
-    if (_iconBytes != null && !['jpg', 'jpeg', 'png'].contains(_iconType)) {
-      _showErrorSnackBar('Only JPG and PNG files are allowed for icons');
-      return;
-    }
-
-    setState(() {
-      _isUploading = true;
-    });
-
-    try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/upload_resource.php');
-
-      var request = http.MultipartRequest('POST', url)
-        ..fields['name'] = _resourceNameController.text
-        ..fields['description'] = _resourceDescriptionController.text
-        ..fields['visibility'] = _isPrivate ? '0' : '1'
-        ..fields['fk_user'] = user_info.id.toString();
-
-      request.files.add(http.MultipartFile.fromBytes(
-        'resource_file',
-        _fileBytes!,
-        filename: _fileName,
-      ));
-
-      if (_iconBytes != null) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'icon_file',
-          _iconBytes!,
-          filename: _iconName,
-        ));
-      }
-
-      final response = await request.send().timeout(const Duration(seconds: 30));
-
-      final responseData = await response.stream.bytesToString();
-
-      try {
-        final decodedResponse = jsonDecode(responseData);
-
-        if (response.statusCode == 200) {
-          if (decodedResponse['success'] == true) {
-            
-            _showSuccessMessage('Resource uploaded successfully!');
-            _resetForm();
-          } else {
-            _showErrorSnackBar('Error: ${decodedResponse['message']}');
-          }
-        } else {
-          _showErrorSnackBar('Upload failed: ${decodedResponse['message'] ?? 'Server error'}');
-        }
-      } catch (e) {
-        _showErrorSnackBar('Error processing server response');
-      }
-    } on SocketException {
-      _showErrorSnackBar('Network error: Please check your connection');
-    } on TimeoutException {
-      _showErrorSnackBar('Request timed out. Please try again');
-    } catch (e) {
-      _showErrorSnackBar('Error uploading: $e');
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
   }
 
   void _showSuccessMessage(String message) {

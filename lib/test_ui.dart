@@ -21,7 +21,6 @@ class _TestScreenState extends State<TestScreen> {
   List<dynamic> tests = [];
   bool isLoading = true;
   String? serverIP;
-  Map<int, int> questionCounts = {}; // Stores test_id -> question_count
 
   @override
   void initState() {
@@ -42,20 +41,18 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
 
-Future<void> _fetchTests() async {
-  if (serverIP == null) return;
+  Future<void> _fetchTests() async {
+    if (serverIP == null) return;
 
-  setState(() {
-    isLoading = true;
-    tests = []; // Clear previous data
-  });
+    setState(() {
+      isLoading = true;
+      tests = [];
+    });
 
-  try {
-    final url = Uri.parse('http://$serverIP/get_tests.php?user_id=${user_info.id}');
-    final response = await http.get(url);
-
-    // First check if response is valid JSON
     try {
+      final url = Uri.parse('http://$serverIP/get_tests.php?user_id=${user_info.id}');
+      final response = await http.get(url);
+
       final data = jsonDecode(response.body);
       
       if (response.statusCode == 200) {
@@ -69,31 +66,88 @@ Future<void> _fetchTests() async {
       } else {
         throw Exception('Server error: ${response.statusCode}');
       }
-    } on FormatException {
-      throw Exception('Invalid server response.');
-    }
-  } catch (e) {
-    print('Error fetching tests: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${e.toString()}'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Retry',
-          onPressed: _fetchTests,
+    } catch (e) {
+      print('Error fetching tests: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _fetchTests,
+          ),
         ),
-      ),
-    );
-  } finally {
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-      });
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
-}
+
+  Future<void> _deleteTest(int testId) async {
+    try {
+      final url = Uri.parse('http://$serverIP/delete_test.php');
+      final response = await http.post(
+        url,
+        body: {
+          'test_id': testId.toString(),
+          'user_id': user_info.id.toString(), // Send user_id for verification
+        },
+      );
+
+      final responseData = json.decode(response.body);
+      
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Test deleted successfully')),
+        );
+        _fetchTests(); // Refresh the list
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete test')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting test: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteTest(BuildContext context, int testId, String testName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Test'),
+        content: Text('Are you sure you want to delete "$testName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteTest(testId);
+    }
+  }
 
   Widget _buildTestCard(Map<String, dynamic> test) {
+    final isOwner = test['fk_user'] == user_info.id;
+    final testId = test['id'];
+    final testName = test['name'] ?? 'Untitled Test';
+    final hasResource = test['has_resource'] ?? false;
+    final isPrivate = !(test['visibility'] ?? true);
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -108,53 +162,108 @@ Future<void> _fetchTests() async {
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      test['name'] ?? 'Untitled Test',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  // Title row with icons moved to the left
+                  Row(
+                    children: [
+                      // Status icons container moved before the title
+                      if (hasResource || (isPrivate && isOwner))
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasResource)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 4),
+                                  child: Icon(Icons.attachment, 
+                                    color: Colors.blue, 
+                                    size: 20),
+                                ),
+                              if (isPrivate && isOwner)
+                                const Icon(Icons.visibility_off, 
+                                  color: Colors.grey, 
+                                  size: 20),
+                            ],
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          testName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  if (test['has_resource'])
-                    const Icon(Icons.attachment, color: Colors.blue),
-                  if (!test['visibility'] && test['is_owner'])
-                    const Icon(Icons.visibility_off, color: Colors.grey),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                test['description'] ?? 'No description',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                  const SizedBox(height: 8),
                   Text(
-                    'Questions: ${test['question_count']}',
-                    style: const TextStyle(fontSize: 14),
+                    test['description'] ?? 'No description',
+                    style: TextStyle(color: Colors.grey[600]),
                   ),
-                  Text(
-                    'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Questions: ${test['question_count']}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      Text(
+                        'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+              // Dropdown menu remains in top-right corner
+              if (isOwner)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, 
+                      color: Colors.grey[600], 
+                      size: 20),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: ListTile(
+                          leading: Icon(Icons.edit, size: 20),
+                          title: Text('Edit Test', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                          title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        // TODO: Implement edit functionality
+                      } else if (value == 'delete') {
+                        _confirmDeleteTest(context, testId, testName);
+                      }
+                    },
+                  ),
+                ),
             ],
           ),
         ),
-      )
+      ),
     );
   }
 
@@ -162,6 +271,10 @@ Future<void> _fetchTests() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
+        ),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           TextButton.icon(
@@ -169,7 +282,7 @@ Future<void> _fetchTests() async {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const CreateTestScreen()),
-              ).then((_) => _fetchTests()); // Refresh list after returning
+              ).then((_) => _fetchTests());
             },
             icon: const Icon(Icons.add),
             label: const Text("Create Test"),

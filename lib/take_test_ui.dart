@@ -37,7 +37,7 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
       await _fetchTestDetails();
       await _fetchQuestions();
     } catch (e) {
-      print('Error initializing server IP: $e');
+      //print('Error initializing server IP: $e');
       _showError('Connection error: $e');
     }
   }

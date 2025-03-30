@@ -40,9 +40,23 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (newIndex) {
-          AppRouter.updateCurrentRoute(context, _routeNames[newIndex]);
-          setState(() => _currentIndex = newIndex);
+        onTap: (newIndex) async {
+          if (_routeNames[newIndex] == '/resources') {
+            final result = await Navigator.pushNamed(
+              context,
+              '/resources',
+            );
+            
+            // If we got back page info, update state
+            if (result != null && result is Map) {
+              setState(() {
+                _currentIndex = newIndex;
+              });
+            }
+          } else {
+            Navigator.pushReplacementNamed(context, _routeNames[newIndex]);
+            setState(() => _currentIndex = newIndex);
+          }
         },
         items: const [
           BottomNavigationBarItem(

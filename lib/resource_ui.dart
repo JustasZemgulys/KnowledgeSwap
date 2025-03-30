@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:knowledgeswap/resource_test_handler.dart';
+import 'package:knowledgeswap/resource_test_generator.dart';
 import 'package:knowledgeswap/web_storage.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
@@ -144,11 +144,75 @@ class _ResourceScreenState extends State<ResourceScreen> {
     }
   }
 
+  Future<void> _editResource(BuildContext context, Map<String, dynamic> resource) async {
+  final result = await Navigator.pushNamed(
+    context,
+    '/edit-resource',
+    arguments: resource,
+  );
+  
+  if (result == true) {
+    _fetchResources(); // Refresh the list after editing
+  }
+}
+
+  Future<void> _confirmDeleteResource(BuildContext context, int resourceId, String resourceName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Resource'),
+        content: Text('Are you sure you want to delete "$resourceName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteResource(resourceId);
+    }
+  }
+
+  Future<void> _deleteResource(int resourceId) async {
+    try {
+      final url = Uri.parse('http://$serverIP/delete_resource.php');
+      final response = await http.post(
+        url,
+        body: {'resource_id': resourceId.toString()},
+      );
+
+      final responseData = json.decode(response.body);
+      
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Resource deleted successfully')),
+        );
+        _fetchResources(); // Refresh the list
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete resource')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting resource: $e')),
+      );
+    }
+  }
+
   Widget _buildResourceCard(Map<String, dynamic> resource) {
     final previewPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
     final resourcePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
     final resourceName = resource['name'] ?? 'Untitled Resource';
     final resourceId = resource['id']; // Get resource ID from the resource data
+    final isOwner = resource['fk_user'] == user_info.id;
 
     return StatefulBuilder(
       builder: (context, setState) {
@@ -220,30 +284,50 @@ class _ResourceScreenState extends State<ResourceScreen> {
                     ],
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
-                    itemBuilder: (context) => [
+              Positioned(
+                top: 8,
+                right: 8,
+                child: PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'generate_test',
+                      child: ListTile(
+                        leading: Icon(Icons.quiz, size: 20),
+                        title: Text('Generate Test', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    if (isOwner) ...[
                       PopupMenuItem(
-                        value: 'generate_test',
+                        value: 'edit',
                         child: ListTile(
-                          leading: Icon(Icons.quiz, size: 20),
-                          title: Text('Generate Test', style: TextStyle(fontSize: 14)),
+                          leading: Icon(Icons.edit, size: 20),
+                          title: Text('Edit Resource', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                          title: Text('Delete Resource', style: TextStyle(fontSize: 14, color: Colors.red)),
                         ),
                       ),
                     ],
-                    /*onSelected: (value) async {
-                      if (value == 'generate_test') {
-                        await ResourceTestHandler.handleResourceTestCreation(
-                          context: context,
-                          resourceId: resourceId,
-                          userId: user_info.id,
-                          resourceName: resourceName,
-                        );
-                      }
-                    },*/
+                  ],
+                  onSelected: (value) async {
+                    if (value == 'generate_test') {
+                      ResourceTestGenerator.navigateToConfigScreen(
+                        context: context,
+                        resourceId: resourceId,
+                        userId: user_info.id,
+                        resourceName: resourceName,
+                      );
+                    } else if (value == 'edit') {
+                      _editResource(context, resource);
+                    } else if (value == 'delete') {
+                      _confirmDeleteResource(context, resourceId, resourceName);
+                    }
+                  },
                   ),
                 ),
               ],
@@ -304,10 +388,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.maybePop(context, {
-            'page': currentPage,
-            'sort': sortOrder,
-          }),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
