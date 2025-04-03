@@ -37,6 +37,7 @@ try {
                 r.fk_user,
                 r.visibility,
                 r.resource_link,
+				r.resource_photo_link,
                 'resource' as type,
                 u.name as creator_name
             FROM resource r
@@ -51,6 +52,7 @@ try {
                 t.creation_date,
                 t.fk_user,
                 t.visibility,
+				t.fk_resource, 	
                 'test' as type,
                 u.name as creator_name
             FROM test t

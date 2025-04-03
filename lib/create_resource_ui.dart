@@ -15,8 +15,9 @@ import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 
 class CreateResourceScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
+  final bool isEditMode;
 
-  const CreateResourceScreen({super.key, this.initialData});
+  const CreateResourceScreen({super.key, this.initialData, this.isEditMode = false,});
 
   @override
   State<CreateResourceScreen> createState() => _CreateResourceScreenState();
@@ -41,6 +42,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   Uint8List? _iconBytes;
   String? _iconName;
   String? _iconType;
+  bool iconDelete = false;
 
   @override
   void initState() {
@@ -52,150 +54,282 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       _resourceNameController.text = widget.initialData!['name'] ?? '';
       _resourceDescriptionController.text = widget.initialData!['description'] ?? '';
       _isPrivate = widget.initialData!['visibility'] != 1;
+      _fileName = widget.initialData!['resource_link'] != null 
+          ? path.basename(widget.initialData!['resource_link']) 
+          : null;
+      _fileType = _fileName?.split('.').last.toLowerCase();
+
+      //print('Initial file path: ${widget.initialData!['resource_link']}');
     }
     
     _resourceNameController.addListener(_updateResourceNameCharCount);
     _resourceDescriptionController.addListener(_updateResourceDescriptionCharCount);
-  }
 
-  Future<void> _uploadResource() async {
-  if (_resourceNameController.text.isEmpty) {
-    _showErrorSnackBar('Please enter a resource name');
-    return;
-  }
-
-  if (widget.initialData == null && (_selectedFile == null || _fileBytes == null)) {
-    _showErrorSnackBar('Please select a resource file to upload');
-    return;
-  }
-
-  if (_selectedFile != null && !['pdf', 'jpg', 'jpeg', 'png'].contains(_fileType)) {
-    _showErrorSnackBar('Only PDF, JPG, and PNG files are allowed for resources');
-    return;
-  }
-
-  if (_iconBytes != null && !['jpg', 'jpeg', 'png'].contains(_iconType)) {
-    _showErrorSnackBar('Only JPG and PNG files are allowed for icons');
-    return;
-  }
-
-  setState(() {
-    _isUploading = true;
-  });
-
-  try {
     if (widget.initialData != null) {
-      await _updateResource();
-    } else {
-      await _createResource();
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isUploading = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadExistingIcon();
+        _loadExistingFile(); // Load the file too
       });
     }
   }
-}
 
-Future<void> _createResource() async {
-  try {
-    final userIP = await getUserIP();
-    final url = Uri.parse('http://$userIP/upload_resource.php');
-
-    var request = http.MultipartRequest('POST', url)
-      ..fields['name'] = _resourceNameController.text
-      ..fields['description'] = _resourceDescriptionController.text
-      ..fields['visibility'] = _isPrivate ? '0' : '1'
-      ..fields['fk_user'] = user_info.id.toString();
-
-    request.files.add(http.MultipartFile.fromBytes(
-      'resource_file',
-      _fileBytes!,
-      filename: _fileName,
-    ));
-
-    if (_iconBytes != null) {
-      request.files.add(http.MultipartFile.fromBytes(
-        'icon_file',
-        _iconBytes!,
-        filename: _iconName,
-      ));
+  Future<void> _uploadResource() async {
+    if (_resourceNameController.text.isEmpty) {
+      _showErrorSnackBar('Please enter a resource name');
+      return;
     }
 
-    final response = await request.send().timeout(const Duration(seconds: 30));
-    final responseData = await response.stream.bytesToString();
-    final decodedResponse = jsonDecode(responseData);
+    if (widget.initialData == null && (_selectedFile == null || _fileBytes == null)) {
+      _showErrorSnackBar('Please select a resource file to upload');
+      return;
+    }
 
-    if (response.statusCode == 200) {
-      if (decodedResponse['success'] == true) {
-        _showSuccessMessage('Resource uploaded successfully!');
-        _resetForm();
+    if (_selectedFile != null && !['pdf', 'jpg', 'jpeg', 'png'].contains(_fileType)) {
+      _showErrorSnackBar('Only PDF, JPG, and PNG files are allowed for resources');
+      return;
+    }
+
+    // Only validate icon file type if we're uploading a new icon (not removing it)
+    if (_iconBytes != null && _iconBytes!.isNotEmpty && !['jpg', 'jpeg', 'png'].contains(_iconType)) {
+      _showErrorSnackBar('Only JPG and PNG files are allowed for icons');
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      if (widget.initialData != null) {
+        await _updateResource();
       } else {
-        _showErrorSnackBar('Error: ${decodedResponse['message']}');
+        await _createResource();
       }
-    } else {
-      _showErrorSnackBar('Upload failed: ${decodedResponse['message'] ?? 'Server error'}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
-  } on SocketException {
-    _showErrorSnackBar('Network error: Please check your connection');
-  } on TimeoutException {
-    _showErrorSnackBar('Request timed out. Please try again');
-  } catch (e) {
-    _showErrorSnackBar('Error uploading: $e');
   }
-}
 
-Future<void> _updateResource() async {
-  try {
-    final userIP = await getUserIP();
-    final url = Uri.parse('http://$userIP/update_resource.php');
+  Future<void> _createResource() async {
+    try {
+      final userIP = await getUserIP();
+      final url = Uri.parse('http://$userIP/upload_resource.php');
 
-    var request = http.MultipartRequest('POST', url)
-      ..fields['resource_id'] = widget.initialData!['id'].toString()
-      ..fields['name'] = _resourceNameController.text
-      ..fields['description'] = _resourceDescriptionController.text
-      ..fields['visibility'] = _isPrivate ? '0' : '1';
+      var request = http.MultipartRequest('POST', url)
+        ..fields['name'] = _resourceNameController.text
+        ..fields['description'] = _resourceDescriptionController.text
+        ..fields['visibility'] = _isPrivate ? '0' : '1'
+        ..fields['fk_user'] = user_info.id.toString();
 
-    // Add resource file if changed
-    if (_fileBytes != null) {
       request.files.add(http.MultipartFile.fromBytes(
         'resource_file',
         _fileBytes!,
         filename: _fileName,
       ));
-    }
 
-    // Add icon file if changed
-    if (_iconBytes != null) {
-      request.files.add(http.MultipartFile.fromBytes(
-        'icon_file',
-        _iconBytes!,
-        filename: _iconName,
-      ));
-    }
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(responseBody);
-      if (jsonResponse['success'] == true) {
-        Navigator.pop(context, true);
-      } else {
-        _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
+      if (_iconBytes != null) {
+        request.files.add(http.MultipartFile.fromBytes(
+          'icon_file',
+          _iconBytes!,
+          filename: _iconName,
+        ));
       }
-    } else {
-      _showErrorSnackBar('Server error: ${response.statusCode}');
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final responseData = await response.stream.bytesToString();
+      final decodedResponse = jsonDecode(responseData);
+
+      if (response.statusCode == 200) {
+        if (decodedResponse['success'] == true) {
+          _showSuccessMessage('Resource uploaded successfully!');
+          _resetForm();
+        } else {
+          _showErrorSnackBar('Error: ${decodedResponse['message']}');
+        }
+      } else {
+        _showErrorSnackBar('Upload failed: ${decodedResponse['message'] ?? 'Server error'}');
+      }
+    } on SocketException {
+      _showErrorSnackBar('Network error: Please check your connection');
+    } on TimeoutException {
+      _showErrorSnackBar('Request timed out. Please try again');
+    } catch (e) {
+      _showErrorSnackBar('Error uploading: $e');
     }
-  } on SocketException {
-    _showErrorSnackBar('Network error - check connection');
-  } on TimeoutException {
-    _showErrorSnackBar('Request timed out');
-  } catch (e) {
-    _showErrorSnackBar('Error: ${e.toString()}');
   }
-}
+
+  Future<void> _updateResource() async {
+    try {
+      final userIP = await getUserIP();
+      final url = Uri.parse('http://$userIP/update_resource.php');
+
+      var request = http.MultipartRequest('POST', url)
+        ..fields['resource_id'] = widget.initialData!['id'].toString()
+        ..fields['name'] = _resourceNameController.text
+        ..fields['description'] = _resourceDescriptionController.text
+        ..fields['visibility'] = _isPrivate ? '0' : '1';
+
+      // Add resource file if changed
+      if (_fileBytes != null) {
+        request.files.add(http.MultipartFile.fromBytes(
+          'resource_file',
+          _fileBytes!,
+          filename: _fileName,
+        ));
+      }
+
+      // Add new icon if provided (removal is handled separately)
+      if (_iconBytes != null && _iconBytes!.isNotEmpty) {
+        request.files.add(http.MultipartFile.fromBytes(
+          'icon_file',
+          _iconBytes!,
+          filename: _iconName,
+        ));
+      } else if (_iconBytes == null && widget.initialData?['resource_photo_link'] != null) {
+        // This indicates we want to remove the existing icon
+        request.fields['remove_icon'] = '1';
+      }
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(responseBody);
+        if (jsonResponse['success'] == true) {
+          Navigator.pop(context, true);
+        } else {
+          _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
+        }
+      } else {
+        _showErrorSnackBar('Server error: ${response.statusCode}');
+      }
+    } on SocketException {
+      _showErrorSnackBar('Network error - check connection');
+    } on TimeoutException {
+      _showErrorSnackBar('Request timed out');
+    } catch (e) {
+      _showErrorSnackBar('Error: ${e.toString()}');
+    }
+  }
+
+  Future<void> _loadExistingIcon() async {
+    // Check if we have valid initial data and a non-empty photo link
+    if (widget.initialData == null || 
+        widget.initialData!['resource_photo_link'] == null || 
+        (widget.initialData!['resource_photo_link'] as String).trim().isEmpty) {
+      //print('No icon available for this resource');
+      return;
+    }
+
+    final iconPath = widget.initialData!['resource_photo_link'].trim();
+    //print('Attempting to load icon from path: $iconPath');
+
+    try {
+      final userIP = await getUserIP();
+      final encodedPath = Uri.encodeComponent(iconPath);
+      final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+      
+      //print('Loading icon from: ${url.toString()}');
+      
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        final contentType = response.headers['content-type']?.toLowerCase();
+        if (contentType?.startsWith('image/') ?? false) {
+          setState(() {
+            _iconBytes = response.bodyBytes;
+            _iconName = path.basename(iconPath);
+            _iconType = _iconName?.split('.').last.toLowerCase();
+          });
+          //print('Successfully loaded icon');
+        } else {
+          //print('Received non-image content. Type: $contentType');
+        }
+      } else {
+        //print('Failed to load icon. Status: ${response.statusCode}');
+        //print('Response: ${response.body}');
+      }
+    } catch (e) {
+      //print('Error loading icon: $e');
+    }
+  }
+
+  Future<void> _loadExistingFile() async {
+    if (widget.initialData == null || 
+        widget.initialData!['resource_link'] == null || 
+        (widget.initialData!['resource_link'] as String).trim().isEmpty) {
+      //print('No file available for this resource');
+      return;
+    }
+
+    final filePath = widget.initialData!['resource_link'].trim();
+    //print('Attempting to load file from path: $filePath');
+
+    try {
+      final userIP = await getUserIP();
+      final encodedPath = Uri.encodeComponent(filePath);
+      final fileType = path.basename(filePath).split('.').last.toLowerCase();
+      
+      // For images, use the image proxy
+      if (fileType == 'jpg' || fileType == 'jpeg' || fileType == 'png') {
+        final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+        //print('Loading image file from proxy: ${url.toString()}');
+        final response = await http.get(url);
+        
+        if (response.statusCode == 200) {
+          setState(() {
+            _fileBytes = response.bodyBytes;
+            _fileName = path.basename(filePath);
+            _fileType = fileType;
+            _selectedFile = PlatformFile(
+              name: _fileName!,
+              size: response.bodyBytes.length,
+              bytes: response.bodyBytes,
+            );
+          });
+          //print('Successfully loaded image file');
+          return;
+        }
+      }
+      
+      // For PDFs or if image proxy fails, try direct download
+      final directUrl = Uri.parse('http://$userIP/download_file.php?path=$encodedPath');
+      //print('Loading file from direct URL: ${directUrl.toString()}');
+      final response = await http.get(directUrl);
+      
+      if (response.statusCode == 200) {
+        setState(() {
+          _fileBytes = response.bodyBytes;
+          _fileName = path.basename(filePath);
+          _fileType = fileType;
+          _selectedFile = PlatformFile(
+            name: _fileName!,
+            size: response.bodyBytes.length,
+            bytes: response.bodyBytes,
+          );
+        });
+        //print('Successfully loaded file via direct download');
+      } else {
+        //print('Failed to load file. Status: ${response.statusCode}');
+        // Still set the filename even if we can't load the content
+        setState(() {
+          _fileName = path.basename(filePath);
+          _fileType = fileType;
+        });
+      }
+    } catch (e) {
+      //print('Error loading file: $e');
+      // Still set the filename even if we can't load the content
+      setState(() {
+        _fileName = path.basename(widget.initialData!['resource_link']);
+        _fileType = _fileName?.split('.').last.toLowerCase();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -270,7 +404,7 @@ Future<void> _updateResource() async {
   }
 
   void _showErrorSnackBar(String message) {
-    print('Showing error snackbar: $message');
+    //print('Showing error snackbar: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -304,29 +438,6 @@ Future<void> _updateResource() async {
     }
   }
 
-  Widget _buildIconPreview() {
-    if (_iconBytes == null) {
-      print('No icon to preview');
-      return Container();
-    }
-    
-    print('Building icon preview');
-    return Column(
-      children: [
-        Image.memory(
-          _iconBytes!,
-          height: 100,
-          width: 100,
-          fit: BoxFit.cover,
-        ),
-        Text(
-          'Icon: $_iconName',
-          style: const TextStyle(fontSize: 12),
-        ),
-      ],
-    );
-  }
-
   void _showSuccessMessage(String message) {
     print('Showing success message: $message');
     ScaffoldMessenger.of(context).showSnackBar(
@@ -357,54 +468,176 @@ Future<void> _updateResource() async {
     print('Form reset complete');
   }
 
-  Widget _buildFilePreview() {
-    if (_fileBytes == null) {
-      return Container();
+  Future<void> _deleteIcon() async {
+    if (widget.initialData == null || widget.initialData!['id'] == null) {
+      // If we're not editing or don't have a resource ID, just clear the local icon
+      setState(() {
+        _iconBytes = null;
+        _iconName = null;
+        _iconType = null;
+      });
+      return;
     }
 
-    if (_fileType == 'jpg' || _fileType == 'jpeg' || _fileType == 'png') {
-      return Column(
-        children: [
-          Image.memory(
-            _fileBytes!,
-            height: 200,
-            width: double.infinity,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '$_fileName',
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
+    try {
+      final userIP = await getUserIP();
+      final url = 'http://$userIP/delete_icon.php';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'resource_id': widget.initialData!['id']}),
       );
-    } else {
-      return Column(
-        children: [
-          const Icon(Icons.insert_drive_file, size: 100),
-          const SizedBox(height: 10),
-          Text(
-            '$_fileName (${_fileType?.toUpperCase()})',
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
+
+      final responseData = jsonDecode(response.body);
+      if (responseData['success'] == true) {
+        setState(() {
+          _iconBytes = null;
+          _iconName = null;
+          _iconType = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Icon removed successfully')),
+        );
+      } else {
+        throw Exception(responseData['message']);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove icon: $e')),
       );
     }
   }
 
+  Widget _buildIconPreview() {
+    return Row(
+      children: [
+        // Icon Preview
+        if (_iconBytes != null && _iconBytes!.isNotEmpty)
+          Image.memory(
+            _iconBytes!,
+            height: 150,
+            width: 150,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.broken_image, size: 60, color: Colors.red);
+            },
+          )
+        else if (widget.isEditMode && widget.initialData?['resource_photo_link'] != null && 
+                _iconBytes == null) // Only show if we haven't marked for deletion
+          const Icon(Icons.image, size: 60, color: Colors.blue)
+        else
+          const Icon(Icons.photo_camera, size: 60, color: Colors.grey),
+        
+        // Remove Icon Button (only shown when there's an icon)
+        if ((_iconBytes != null && _iconBytes!.isNotEmpty) || 
+            (widget.isEditMode && widget.initialData?['resource_photo_link'] != null && _iconBytes == null))
+          Padding(
+            padding: const EdgeInsets.only(left: 10),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onPressed: _deleteIcon,
+              child: const Text('Remove'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFilePreview() {
+    // Show selected new file if available
+    if (_fileBytes != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          //const Text(
+          //  'Selected file:',
+          //  style: TextStyle(fontWeight: FontWeight.bold),
+          //),
+          //const SizedBox(height: 10),
+          if (_fileType == 'jpg' || _fileType == 'jpeg' || _fileType == 'png')
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: 200,
+                maxWidth: MediaQuery.of(context).size.width,
+              ),
+              child: Image.memory(
+                _fileBytes!,
+                fit: BoxFit.contain,
+              ),
+            )
+          else if (_fileType == 'pdf')
+            const Icon(Icons.picture_as_pdf, size: 100, color: Colors.red)
+          else
+            const Icon(Icons.insert_drive_file, size: 100),
+          const SizedBox(height: 10),
+          Text(
+            '${_fileName ?? 'No filename'} (${_fileType?.toUpperCase()})',
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
+      );
+    }
+
+    // Show existing file info when editing
+    if (widget.isEditMode && widget.initialData?['resource_link'] != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Current file:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          if (_fileType == 'pdf')
+            const Icon(Icons.picture_as_pdf, size: 100, color: Colors.red)
+          else if (_fileType == 'jpg' || _fileType == 'jpeg' || _fileType == 'png')
+            _fileBytes != null 
+              ? ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: 200,
+                    maxWidth: MediaQuery.of(context).size.width,
+                  ),
+                  child: Image.memory(
+                    _fileBytes!,
+                    fit: BoxFit.contain,
+                  ),
+                )
+              : const CircularProgressIndicator()
+          else
+            const Icon(Icons.insert_drive_file, size: 100),
+          const SizedBox(height: 10),
+          Text(
+            _fileName ?? 'Loading...',
+            style: const TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            '(Select a new file to replace)',
+            style: TextStyle(fontSize: 10, color: Colors.grey),
+          ),
+        ],
+      );
+    }
+
+    return Container();
+  }
+
   @override
   Widget build(BuildContext context) {
-    print('Building CreateResourceScreen UI');
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Create a Resource"),
+        title: Text(widget.isEditMode ? "Edit Resource" : "Create a Resource"),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           const SizedBox(width: 1),
           IconButton(
             icon: Image.asset("assets/usericon.jpg"),
             onPressed: () {
-              print('Navigating to profile details');
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -504,7 +737,6 @@ Future<void> _updateResource() async {
               subtitle: const Text('Private resources are only visible to you'),
               value: _isPrivate,
               onChanged: (bool value) {
-                print('Privacy setting changed to: ${value ? 'private' : 'public'}');
                 setState(() {
                   _isPrivate = value;
                 });
@@ -527,8 +759,8 @@ Future<void> _updateResource() async {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Text(
-                        'Upload Resource',
+                    : Text(
+                        widget.isEditMode ? 'Update Resource' : 'Upload Resource',
                         style: TextStyle(fontSize: 16),
                       ),
               ),

@@ -17,7 +17,7 @@ try {
         $testId = $_GET['test_id'];
         
         $stmt = $pdo->prepare("
-            SELECT id, name, description, answer, `index`
+            SELECT id, name, description, answer, `index`, ai_made
             FROM question 
             WHERE fk_test = ?
             ORDER BY `index` ASC

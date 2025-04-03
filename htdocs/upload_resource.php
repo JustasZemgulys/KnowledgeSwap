@@ -39,22 +39,22 @@ try {
     $iconFile = $_FILES['icon_file'] ?? null;
 
     // Create directories if they don't exist
-		$resourceDir = "knowledgeswap/resources/";
-		$iconDir = "knowledgeswap/icons/";
+    $resourceDir = "knowledgeswap/resources/";
+    $iconDir = "knowledgeswap/icons/";
 
-		// Create resource directory if it doesn't exist
-		if (!file_exists($resourceDir)) {
-			if (!mkdir($resourceDir, 0777, true)) {
-				throw new Exception("Failed to create resource directory");
-			}
-		}
+    // Create resource directory if it doesn't exist
+    if (!file_exists($resourceDir)) {
+        if (!mkdir($resourceDir, 0777, true)) {
+            throw new Exception("Failed to create resource directory");
+        }
+    }
 
-		// Create icon directory if it doesn't exist
-		if (!file_exists($iconDir)) {
-			if (!mkdir($iconDir, 0777, true)) {
-				throw new Exception("Failed to create icon directory");
-			}
-		}
+    // Create icon directory if it doesn't exist
+    if (!file_exists($iconDir)) {
+        if (!mkdir($iconDir, 0777, true)) {
+            throw new Exception("Failed to create icon directory");
+        }
+    }
 
     // Process resource file
     $resourceExt = strtolower(pathinfo($resourceFile['name'], PATHINFO_EXTENSION));
@@ -70,7 +70,7 @@ try {
     }
 
     // Process icon file if provided
-    $iconPath = '';
+    $iconPath = null;
     if ($iconFile && $iconFile['error'] == UPLOAD_ERR_OK) {
         $iconExt = strtolower(pathinfo($iconFile['name'], PATHINFO_EXTENSION));
         if (!in_array($iconExt, ['jpg', 'jpeg', 'png'])) {

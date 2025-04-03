@@ -1,0 +1,15 @@
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+<FilesMatch "\.(jpg|jpeg|png|gif|webp)$">
+    ForceType image/jpeg
+    Header set Content-Type "image/jpeg"
+</FilesMatch>
+
+<FilesMatch "\.(pdf)$">
+    ForceType application/octet-stream
+    Header set Content-Disposition attachment
+</FilesMatch>

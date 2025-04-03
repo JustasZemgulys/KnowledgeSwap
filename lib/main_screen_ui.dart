@@ -1,7 +1,4 @@
-// ignore_for_file: unused_field
-
 import 'package:flutter/material.dart';
-import 'package:knowledgeswap/AppRouter.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';

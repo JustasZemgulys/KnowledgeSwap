@@ -148,6 +148,7 @@ class _TestScreenState extends State<TestScreen> {
     final testName = test['name'] ?? 'Untitled Test';
     final hasResource = test['has_resource'] ?? false;
     final isPrivate = !(test['visibility'] ?? true);
+    final isAIMade = test['ai_made'] ?? false;
 
     return Card(
       elevation: 2,
@@ -171,8 +172,8 @@ class _TestScreenState extends State<TestScreen> {
                   // Title row with icons moved to the left
                   Row(
                     children: [
-                      // Status icons container moved before the title
-                      if (hasResource || (isPrivate && isOwner))
+                      // Status indicators container moved before the title
+                      if (hasResource || (isPrivate && isOwner) || isAIMade)
                         Container(
                           margin: const EdgeInsets.only(right: 8),
                           child: Row(
@@ -186,9 +187,35 @@ class _TestScreenState extends State<TestScreen> {
                                     size: 20),
                                 ),
                               if (isPrivate && isOwner)
-                                const Icon(Icons.visibility_off, 
-                                  color: Colors.grey, 
-                                  size: 20),
+                                Container(
+                                  child: const Text(
+                                    'Private',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              if (isAIMade)
+                                Tooltip(
+                                  message: 'AI Generated Test',
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.blue, width: 1),
+                                    ),
+                                    child: const Text(
+                                      'AI',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -272,7 +299,8 @@ class _TestScreenState extends State<TestScreen> {
       ),
     );
   }
-
+    
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -103,6 +103,21 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
                   'Question $questionNumber',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
+                if ((question['ai_made'] ?? 0) == 1)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Tooltip(
+                    message: 'AI Generated',
+                    child: Text(
+                      'AI',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -206,6 +221,21 @@ class ReviewScreen extends StatelessWidget {
                 Text(
                   'Question $questionNumber',
                   style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                if ((question['ai_made'] ?? 0) == 1)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Tooltip(
+                    message: 'AI Generated',
+                    child: Text(
+                      'AI',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

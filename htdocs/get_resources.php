@@ -32,6 +32,7 @@ try {
             creation_date,
             resource_photo_link,
 			resource_link,
+			visibility,
 			fk_user
         FROM resource
         ORDER BY creation_date $sort

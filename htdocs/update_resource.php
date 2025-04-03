@@ -5,26 +5,22 @@ header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
 // Enable error reporting only for development
-ini_set('display_errors', 0);
 error_reporting(0);
 
 $response = ['success' => false, 'message' => 'Request failed'];
 
 try {
-    // Validate request method
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception("Only POST requests allowed");
-    }
-
     // Database connection
     $conn = new mysqli("localhost", "root", "", "knowledgeswap");
     if ($conn->connect_error) {
         throw new Exception("DB connection failed");
     }
 
-    // Get POST data
+    // Validate input
     $resourceId = (int)($_POST['resource_id'] ?? 0);
     if ($resourceId <= 0) throw new Exception("Invalid resource ID");
+    
+    $remove_icon = isset($_POST['remove_icon']) && $_POST['remove_icon'] === '1';
 
     // Get existing paths
     $stmt = $conn->prepare("SELECT resource_link, resource_photo_link FROM resource WHERE id = ?");
@@ -33,6 +29,7 @@ try {
     $result = $stmt->get_result();
     if ($result->num_rows === 0) throw new Exception("Resource not found");
     $resource = $result->fetch_assoc();
+    $stmt->close();
 
     // Process file uploads
     $resourceDir = "knowledgeswap/resources/";
@@ -64,9 +61,19 @@ try {
         $newResourcePath = $newPath;
     }
 
-    // Handle icon file
+    // Handle icon
     $newIconPath = $resource['resource_photo_link'];
-    if (isset($_FILES['icon_file']['error']) && $_FILES['icon_file']['error'] === UPLOAD_ERR_OK) {
+    
+    // If icon should be removed
+    if ($remove_icon) {
+        // Delete old icon if exists
+        if (!empty($newIconPath) && file_exists($newIconPath)) {
+            unlink($newIconPath);
+        }
+        $newIconPath = null;
+    } 
+    // If new icon is uploaded
+    elseif (isset($_FILES['icon_file']['error']) && $_FILES['icon_file']['error'] === UPLOAD_ERR_OK) {
         $icon = $_FILES['icon_file'];
         $ext = strtolower(pathinfo($icon['name'], PATHINFO_EXTENSION));
         if (!in_array($ext, ['jpg','jpeg','png'])) throw new Exception("Invalid icon type");
@@ -78,31 +85,49 @@ try {
             throw new Exception("Failed to save icon");
         }
         
-        // Delete old icon
-        if (!empty($resource['resource_photo_link']) && file_exists($resource['resource_photo_link'])) {
-            unlink($resource['resource_photo_link']);
+        // Delete old icon if exists
+        if (!empty($newIconPath) && file_exists($newIconPath)) {
+            unlink($newIconPath);
         }
         
         $newIconPath = $newIcon;
     }
 
     // Update database
-    $stmt = $conn->prepare("UPDATE resource SET 
-        name = ?, 
-        description = ?, 
-        visibility = ?,
-        resource_link = ?,
-        resource_photo_link = ?
-        WHERE id = ?");
-    
-    $stmt->bind_param("ssissi", 
-        $_POST['name'],
-        $_POST['description'],
-        $_POST['visibility'],
-        $newResourcePath,
-        $newIconPath,
-        $resourceId
-    );
+    if ($newIconPath === null) {
+        $stmt = $conn->prepare("UPDATE resource SET 
+            name = ?, 
+            description = ?, 
+            visibility = ?,
+            resource_link = ?,
+            resource_photo_link = NULL
+            WHERE id = ?");
+        
+        $stmt->bind_param("ssisi", 
+            $_POST['name'],
+            $_POST['description'],
+            $_POST['visibility'],
+            $newResourcePath,
+            $resourceId
+        );
+    } else {
+        $stmt = $conn->prepare("UPDATE resource SET 
+            name = ?, 
+            description = ?, 
+            visibility = ?,
+            resource_link = ?,
+            resource_photo_link = ?
+            WHERE id = ?");
+        
+        $stmt->bind_param("ssissi", 
+            $_POST['name'],
+            $_POST['description'],
+            $_POST['visibility'],
+            $newResourcePath,
+            $newIconPath,
+            $resourceId
+        );
+    }
 
     if (!$stmt->execute()) {
         throw new Exception("DB update failed: ".$conn->error);
@@ -110,7 +135,7 @@ try {
 
     $response = [
         'success' => true,
-        'message' => 'Resource updated',
+        'message' => 'Resource updated successfully',
         'paths' => [
             'resource' => $newResourcePath,
             'icon' => $newIconPath

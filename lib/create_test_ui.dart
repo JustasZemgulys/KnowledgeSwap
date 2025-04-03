@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
+import 'package:knowledgeswap/resource_search_screen.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
@@ -24,16 +25,18 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _topicController = TextEditingController();
   final TextEditingController _parametersController = TextEditingController();
-  //final TextEditingController _amountController = TextEditingController();
   int _titleCharCount = 0;
   int _descriptionCharCount = 0;
   final int _maxTitleLength = 255;
   final int _maxDescriptionLength = 255;
   List<String> _questions = [];
   PlatformFile? _selectedFile;
-
-  // List to hold the question forms
-  List<_QuestionFormData> _questionFormData = [];
+  int? _selectedResourceId;
+  String? _selectedResourcePath;
+  bool _isResourceAttached = false;
+  int _visibility = 1;
+  String serverIP = '';
+  List<_QuestionFormData> _questionFormData = [];  // List to hold the question forms
 
   @override
   void initState() {
@@ -46,11 +49,23 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     if (widget.initialTestData != null) {
       _titleController.text = widget.initialTestData!['name'] ?? '';
       _descriptionController.text = widget.initialTestData!['description'] ?? '';
+      if (widget.initialTestData!['visibility'] is bool) {
+      _visibility = widget.initialTestData!['visibility'] ? 1 : 0;
+      } else {
+        _visibility = widget.initialTestData!['visibility'] as int;
+      }
+      if (widget.initialTestData!['fk_resource'] != null) {
+        _selectedResourceId = widget.initialTestData!['fk_resource'];
+        _isResourceAttached = true;
+        // Initialize with the data we already have
+        _selectedResourcePath = widget.initialTestData!['resource_link'];
+      }
       _loadExistingQuestions();
     }
   }
 
   Future<void> _loadExistingQuestions() async {
+    serverIP = await getUserIP();
     if (widget.initialTestData == null) return;
 
     try {
@@ -68,17 +83,30 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           
           setState(() {
             _questionFormData = questions.map((q) {
-              return _QuestionFormData(index: q['index'] ?? (_questionFormData.length + 1))
+              // Convert database value to proper boolean
+              // Assuming ai_made is 1 for true and 0 for false in the database
+              final bool isAiMade = (q['ai_made'] ?? 0) == 1;
+              
+              return _QuestionFormData(
+                index: q['index'] ?? (_questionFormData.length + 1),
+                aiMade: isAiMade,
+              )
                 ..questionId = q['id']
-                ..questionTitleController.text = q['name'] ?? ''
-                ..questionDescriptionController.text = q['description'] ?? ''
-                ..questionAnswerController.text = q['answer'] ?? '';
+                ..initializeWithExistingData(
+                  q['name'] ?? '',
+                  q['description'] ?? '',
+                  q['answer'] ?? '',
+                  isAiMade,
+                );
             }).toList();
           });
         }
       }
     } catch (e) {
       print('Error loading questions: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load questions: $e')),
+      );
     }
   }
 
@@ -110,7 +138,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           retry = true; // Retry if response is null
         }
       } catch (e) {
-        print('Error: $e');
+        //print('Error: $e');
         retry = true; // Retry if an exception occurs
       }
 
@@ -125,6 +153,112 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
+  Future<void> _selectExistingResource() async {
+    try {
+      final selectedResource = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ResourceSearchScreen(),
+        ),
+      );
+
+      if (selectedResource != null && mounted) {
+        setState(() {
+          _selectedResourceId = selectedResource['id'];
+          //_selectedResourceName = selectedResource['name'];
+          _selectedResourcePath = selectedResource['resource_link'];
+          _isResourceAttached = true;
+          // No need to fetch details - we already have them from the search
+          //_resourceDetailsFuture = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to select resource: $e')),
+        );
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchResourceDetails(int resourceId) async {
+    try {
+      final userIP = await getUserIP();
+      final url = 'http://$userIP/get_resource_details.php?resource_id=$resourceId';
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true && responseData['resource'] != null) {
+          return responseData['resource'];
+        }
+      }
+      throw Exception('Failed to load resource details');
+    } catch (e) {
+      debugPrint('Error fetching resource details: $e');
+      rethrow;
+    }
+  }
+
+  // Add this method to remove attached resource
+  void _removeAttachedResource() {
+    setState(() {
+      _selectedResourceId = null;
+      //_selectedResourceName = null;
+      _selectedResourcePath = null;
+      _isResourceAttached = false;
+      //_resourceDetailsFuture = null; // Clear the cached future
+    });
+  }
+
+  Future<PlatformFile?> _getFileFromPath(String path) async {
+    try {
+      final serverIP = await getUserIP();
+      
+      // Clean the path by removing leading slashes and encoding special characters
+      final cleanPath = path.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
+      final fullUrl = 'http://$serverIP/$cleanPath';
+      
+      print('Attempting to fetch file from: $fullUrl'); // Debug logging
+
+      // First check if the file exists by making a HEAD request
+      final headResponse = await http.head(Uri.parse(fullUrl));
+      if (headResponse.statusCode != 200) {
+        print('File not found or inaccessible (HTTP ${headResponse.statusCode})');
+        return null;
+      }
+
+      // Now make the GET request to fetch the file
+      final response = await http.get(
+        Uri.parse(fullUrl),
+        headers: {
+          'Accept': 'application/octet-stream',
+          'Origin': 'http://$serverIP', // Match your server's CORS policy
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Get filename from path
+        final filename = cleanPath.split('/').last;
+        
+        // Get content type from headers
+        //final contentType = response.headers['content-type'] ?? 'application/octet-stream';
+        
+        return PlatformFile(
+          name: filename,
+          bytes: response.bodyBytes,
+          size: response.bodyBytes.length,
+        );
+      } else {
+        print('Server returned status code ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching file: $e');
+      return null;
+    }
+  }
+
   /// Sends a request to the server and returns the response data.
   Future<Map<String, dynamic>?> _sendRequest(String url, String topic, String parameters) async {
     try {
@@ -135,12 +269,18 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       request.fields['parameters'] = parameters;
 
       // Add file if selected
-      if (_selectedFile != null) {
+      PlatformFile? fileToUpload = _selectedFile;
+      if (fileToUpload == null && _selectedResourcePath != null) {
+        fileToUpload = await _getFileFromPath(_selectedResourcePath!);
+      }
+
+      // Add file if available
+      if (fileToUpload != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
             'file',
-            _selectedFile!.bytes!,
-            filename: _selectedFile!.name,
+            fileToUpload.bytes!,
+            filename: fileToUpload.name,
           ),
         );
       }
@@ -148,22 +288,22 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       var response = await request.send();
 
       // Log status code and headers
-      print('Status Code: ${response.statusCode}');
-      print('Headers: ${response.headers}');
+      //print('Status Code: ${response.statusCode}');
+      //print('Headers: ${response.headers}');
 
       if (response.statusCode == 200) {
         var responseData = await response.stream.bytesToString();
-        print('Raw Response: $responseData'); // Log the raw response
+        //print('Raw Response: $responseData'); // Log the raw response
         return json.decode(responseData);
       } else {
-        print('Server Response: ${response.statusCode}');
-        var responseData = await response.stream.bytesToString();
-        print('Body: $responseData');
+        //print('Server Response: ${response.statusCode}');
+        //var responseData = await response.stream.bytesToString();
+        //print('Body: $responseData');
         return null;
       }
-    } catch (e, stackTrace) {
-      print("Error in _sendRequest: $e");
-      print("Stack Trace: $stackTrace");
+    } catch (e) {
+      //print("Error in _sendRequest: $e");
+      //print("Stack Trace: $stackTrace");
       return null;
     }
   }
@@ -178,7 +318,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       String options = _extractOptions(content);
       String answer = _extractAnswer(content);
 
-      // Validate extracted data
       if (question.isEmpty || answer.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to generate valid question - missing title or answer")),
@@ -188,10 +327,13 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
       // Create a new question form with the extracted data
       setState(() {
-        _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1)
-          ..questionTitleController.text = question
-          ..questionDescriptionController.text = options
-          ..questionAnswerController.text = answer);
+        final newQuestion = _QuestionFormData(
+          index: _questionFormData.length + 1,
+          aiMade: true,
+        )..initializeWithExistingData(question, options, answer, true);
+        
+        
+        _questionFormData.add(newQuestion);
       });
       return true;
     }
@@ -223,16 +365,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       return answerRegex.firstMatch(content)!.group(1)!.trim();
     }
     return '';
-  }
-
-  Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-
-    if (result != null) {
-      setState(() {
-        _selectedFile = result.files.first;
-      });
-    }
   }
 
   @override
@@ -277,126 +409,307 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   }
 }
 
-void _moveQuestionDown(int index) {
-  if (index < _questionFormData.length - 1) {
-    setState(() {
-      final question = _questionFormData.removeAt(index);
-      _questionFormData.insert(index + 1, question);
-      _updateQuestionIndexes();
-    });
-  }
-}
-
-void _updateQuestionIndexes() {
-  for (int i = 0; i < _questionFormData.length; i++) {
-    _questionFormData[i].index = i + 1; // Update to 1-based index
-  }
-}
-
-void _saveTest() async {
-  // Validate test name
-  if (_titleController.text.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Please enter a test title")),
-    );
-    return;
-  }
-
-  // Validate at least one question
-  if (_questionFormData.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Please add at least one question")),
-    );
-    return;
-  }
-
-  // Validate each question has title and answer
-  for (int i = 0; i < _questionFormData.length; i++) {
-    final question = _questionFormData[i];
-    if (question.questionTitleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Question ${i + 1} is missing a title")),
-      );
-      return;
-    }
-    if (question.questionAnswerController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Question ${i + 1} is missing an answer")),
-      );
-      return;
+  void _moveQuestionDown(int index) {
+    if (index < _questionFormData.length - 1) {
+      setState(() {
+        final question = _questionFormData.removeAt(index);
+        _questionFormData.insert(index + 1, question);
+        _updateQuestionIndexes();
+      });
     }
   }
 
-  // Get user info
-  final userInfoProvider = Provider.of<UserInfoProvider>(context, listen: false);
-  final userInfo = userInfoProvider.userInfo;
-
-  if (userInfo == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("User not logged in")),
-    );
-    return;
+  void _updateQuestionIndexes() {
+    for (int i = 0; i < _questionFormData.length; i++) {
+      _questionFormData[i].index = i + 1; // Update to 1-based index
+    }
   }
 
-  // Prepare test data
-  final testData = {
-    'name': _titleController.text,
-    'description': _descriptionController.text,
-    'questions': _questionFormData.map((question) => {
-      'title': question.questionTitleController.text,
-      'description': question.questionDescriptionController.text,
-      'answer': question.questionAnswerController.text,
-      'index': question.index,
-      'id': question.questionId, // Include question ID if editing
-    }).toList(),
-    'userId': userInfo.id,
-  };
+  void _saveTest() async {
+    // Validate test name
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please enter a test title")),
+      );
+      return;
+    }
 
-  // If editing, include test ID
-  if (widget.initialTestData != null) {
-    testData['testId'] = widget.initialTestData!['id'];
-  }
+    // Validate at least one question
+    if (_questionFormData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please add at least one question")),
+      );
+      return;
+    }
 
-  // Send data to the server
-  final userIP = await getUserIP();
-  final url = widget.initialTestData != null 
-      ? 'http://$userIP/update_test.php'
-      : 'http://$userIP/save_test.php';
-
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(testData),
-    );
-
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      if (responseData['success'] == true) {
+    // Validate each question has title and answer
+    for (int i = 0; i < _questionFormData.length; i++) {
+      final question = _questionFormData[i];
+      if (question.questionTitleController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.initialTestData != null 
-              ? "Test updated successfully" 
-              : "Test saved successfully")),
+          SnackBar(content: Text("Question ${i + 1} is missing a title")),
         );
-        Navigator.pop(context, true);
-      } else {
-        print('Operation failed: $responseData');
+        return;
+      }
+      if (question.questionAnswerController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? "Operation failed")),
+          SnackBar(content: Text("Question ${i + 1} is missing an answer")),
+        );
+        return;
+      }
+    }
+
+    // Get user info
+    final userInfoProvider = Provider.of<UserInfoProvider>(context, listen: false);
+    final userInfo = userInfoProvider.userInfo;
+
+    if (userInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("User not logged in")),
+      );
+      return;
+    }
+
+    try {
+      print('Visibility value being sent: $_visibility'); 
+      final testData = {
+        'name': _titleController.text,
+        'description': _descriptionController.text,
+        'questions': _questionFormData.map((question) {
+          return {
+            'title': question.questionTitleController.text,
+            'description': question.questionDescriptionController.text,
+            'answer': question.questionAnswerController.text,
+            'index': question.index,
+            'id': question.questionId,
+            'ai_made': question.aiMade ? 1 : 0,
+          };
+        }).toList(),
+        'userId': userInfo.id,
+        'fk_resource': _selectedResourceId,
+        'visibility': _visibility,
+      };
+
+      if (widget.initialTestData != null) {
+        testData['testId'] = widget.initialTestData!['id'];
+      }
+
+      final userIP = await getUserIP();
+      final url = widget.initialTestData != null 
+          ? 'http://$userIP/update_test.php'
+          : 'http://$userIP/save_test.php';
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(testData),
+      );
+
+      // Handle response
+      if (response.statusCode == 200) {
+        try {
+          final responseData = jsonDecode(response.body);
+          if (responseData['success'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(widget.initialTestData != null 
+                  ? "Test updated successfully" 
+                  : "Test saved successfully")),
+            );
+            Navigator.pop(context, true);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(responseData['message'] ?? "Operation failed")),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Invalid server response")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
         );
       }
-    } else {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save test. Status code: ${response.statusCode}")),
+        SnackBar(content: Text("Error: ${e.toString()}")),
       );
     }
-  } catch (e) {
-    print('Error: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error: $e")),
+  }
+
+Widget _buildResourceAttachmentSection() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SizedBox(height: 20),
+      const Text(
+        "Attach Resource:",
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 10),
+      ElevatedButton(
+        onPressed: _selectExistingResource,
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search),
+            SizedBox(width: 8),
+            Text("Search and Select Resource"),
+          ],
+        ),
+      ),
+      if (_isResourceAttached && _selectedResourceId != null) ...[
+        const SizedBox(height: 10),
+        FutureBuilder<Map<String, dynamic>>(
+          future: _fetchResourceDetails(_selectedResourceId!),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (snapshot.hasError) {
+              return Text('Error loading resource: ${snapshot.error}');
+            }
+            
+            if (snapshot.hasData) {
+              final resource = snapshot.data!;
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: _buildResourcePreview(resource),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              resource['name'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              resource['resource_photo_link'] ?? resource['resource_link'] ?? '',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.red),
+                        onPressed: _removeAttachedResource,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return const Text('Loading resource details...');
+          },
+        ),
+      ],
+    ],
+  );
+}
+
+Widget _buildResourcePreview(Map<String, dynamic> resource) {
+  final iconPath = resource['resource_photo_link'] ?? '';
+  final filePath = resource['resource_link'] ?? '';
+  final displayName = resource['name'] ?? '';
+
+  // Clean paths by removing leading slashes and encoding special characters
+  final cleanIconPath = iconPath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
+  final cleanFilePath = filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
+
+  // 1. First try to show icon image if available (resource_photo_link)
+  if (cleanIconPath.isNotEmpty) {
+    final iconUrl = 'http://$serverIP/$cleanIconPath';
+    return Image.network(
+      iconUrl,
+      width: 40,
+      height: 40,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        // If icon fails, try showing the actual file if it's an image
+        return _getFilePreview(cleanFilePath, displayName);
+      },
     );
   }
+  
+  // 2. No icon available - try showing the file itself if it's an image
+  return _getFilePreview(cleanFilePath, displayName);
+}
+
+Widget _getFilePreview(String filePath, String displayName) {
+  if (filePath.isEmpty) {
+    return _getFileTypeIcon(null, displayName);
   }
+
+  // Check common image extensions
+  final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].any(
+    (ext) => filePath.toLowerCase().endsWith(ext)
+  );
+
+  if (isImage) {
+    final imageUrl = 'http://$serverIP/$filePath';
+    return Image.network(
+      imageUrl,
+      width: 40,
+      height: 40,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _getFileTypeIcon(filePath, displayName);
+      },
+    );
+  }
+
+  return _getFileTypeIcon(filePath, displayName);
+}
+
+Widget _getFileTypeIcon(String? filePath, String displayName) {
+  if (filePath == null) {
+    return Tooltip(
+      message: displayName,
+      child: const Icon(Icons.insert_drive_file, size: 40),
+    );
+  }
+
+  if (filePath.toLowerCase().endsWith('.pdf')) {
+    return Tooltip(
+      message: displayName,
+      child: const Icon(Icons.picture_as_pdf, size: 40, color: Colors.red),
+    );
+  }
+
+  return Tooltip(
+    message: displayName,
+    child: const Icon(Icons.insert_drive_file, size: 40),
+  );
+}
+
+Widget _buildVisibilitySwitch() {
+  return SwitchListTile(
+    title: const Text('Make this test private'),
+    subtitle: const Text('Private tests are only visible to you'),
+    value: _visibility == 0, // True when private (0), false when public (1)
+    onChanged: (bool newValue) {
+      setState(() {
+        // Toggle between 0 and 1
+        _visibility = newValue ? 0 : 1;
+        //print('Visibility toggled to: $_visibility (${newValue ? 'Private' : 'Public'})');
+      });
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -425,7 +738,7 @@ void _saveTest() async {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            TextField(//Title
               controller: _titleController,
               maxLength: _maxTitleLength,
               decoration: InputDecoration(
@@ -437,7 +750,7 @@ void _saveTest() async {
               ),
             ),
             const SizedBox(height: 20),
-            TextField(
+            TextField(//Description
               controller: _descriptionController,
               maxLength: _maxDescriptionLength,
               maxLines: 5,
@@ -450,25 +763,26 @@ void _saveTest() async {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
+            ElevatedButton(//Create Question
               onPressed: _addQuestionForm,
               child: const Text("Create Question"),
             ),
             const SizedBox(height: 20),
-            // Display the question forms here
-            Column(
+            Column(// Displays the question forms here
               children: [
                 for (int i = 0; i < _questionFormData.length; i++)
                   _QuestionForm(
-                      key: ObjectKey(_questionFormData[i]),
-                      questionFormData: _questionFormData[i],
-                      onRemove: () => _removeQuestionForm(i),
-                      onMoveUp: () => _moveQuestionUp(i),
-                      onMoveDown: () => _moveQuestionDown(i)),
+                    key: ObjectKey(_questionFormData[i]),
+                    questionFormData: _questionFormData[i],
+                    onRemove: () => _removeQuestionForm(i),
+                    onMoveUp: () => _moveQuestionUp(i),
+                    onMoveDown: () => _moveQuestionDown(i),
+                    showAIBadge: _questionFormData[i].aiMade && !_questionFormData[i]._hasBeenEdited,
+                  ),
               ],
             ),
             const SizedBox(height: 20),
-            TextField(
+            TextField(//Topic
               controller: _topicController,
               decoration: InputDecoration(
                 labelText: "Topic",
@@ -477,7 +791,7 @@ void _saveTest() async {
               ),
             ),
             const SizedBox(height: 20),
-            TextField(
+            TextField(//Parameters
               controller: _parametersController,
               decoration: InputDecoration(
                 labelText: "Parameters",
@@ -486,10 +800,11 @@ void _saveTest() async {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _pickFile,
-              child: const Text("Upload PDF/JPG"),
-            ),
+             _buildResourceAttachmentSection(),
+            //ElevatedButton(
+            //  onPressed: _pickFile,
+            //  child: const Text("Upload PDF/JPG"),
+            //),
             const SizedBox(height: 20),
             if (_selectedFile != null)
               Text("Selected File: ${_selectedFile!.name}"),
@@ -508,6 +823,8 @@ void _saveTest() async {
                     Text("${i + 1}. ${_questions[i]}"),
                 ],
               ),
+            const SizedBox(height: 20),
+            _buildVisibilitySwitch(),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _saveTest,
@@ -530,19 +847,110 @@ class _QuestionFormData {
   final int maxQuestionTitleLength = 255;
   final int maxQuestionDescriptionLength = 255;
   final int maxQuestionAnswerLength = 255;
-  int index; // This will track the question order
-  int? questionId; // Add this to track existing question IDs
+  int index;
+  int? questionId;
+  bool aiMade;
+  bool _hasBeenEdited = false;
+  String? _initialTitle;
+  String? _initialDescription;
+  String? _initialAnswer;
+  VoidCallback? onEdit;
 
-  _QuestionFormData({required this.index, this.questionId}) {
-    questionTitleController.addListener(() {
-      questionTitleCharCount = questionTitleController.text.length;
-    });
-    questionDescriptionController.addListener(() {
-      questionDescriptionCharCount = questionDescriptionController.text.length;
-    });
-    questionAnswerController.addListener(() {
-      questionAnswerCharCount = questionAnswerController.text.length;
-    });
+  _QuestionFormData({
+    required this.index, 
+    this.aiMade = false
+  }) {
+    _initialTitle = questionTitleController.text;
+    _initialDescription = questionDescriptionController.text;
+    _initialAnswer = questionAnswerController.text;
+
+    // Setup listeners for character counting and edit detection
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    questionTitleController.addListener(_updateTitleState);
+    questionDescriptionController.addListener(_updateDescriptionState);
+    questionAnswerController.addListener(_updateAnswerState);
+  }
+
+  void _updateTitleState() {
+    questionTitleCharCount = questionTitleController.text.length;
+    _checkForEdits();
+  }
+
+  void _updateDescriptionState() {
+    questionDescriptionCharCount = questionDescriptionController.text.length;
+    _checkForEdits();
+  }
+
+  void _updateAnswerState() {
+    questionAnswerCharCount = questionAnswerController.text.length;
+    _checkForEdits();
+  }
+
+  void _checkForEdits() {
+    if (!_hasBeenEdited && aiMade) {
+      final currentTitle = questionTitleController.text;
+      final currentDescription = questionDescriptionController.text;
+      final currentAnswer = questionAnswerController.text;
+
+      if (currentTitle != _initialTitle || 
+          currentDescription != _initialDescription || 
+          currentAnswer != _initialAnswer) {
+        _markAsEdited();
+      }
+    }
+  }
+
+  void _markAsEdited() {
+    if (!_hasBeenEdited) {  // Only update if not already marked
+      _hasBeenEdited = true;
+      aiMade = false;  // Remove AI status when edited
+      if (onEdit != null) {
+        onEdit!();  // Notify parent to rebuild
+      }
+    }
+  }
+
+  void initializeWithExistingData(
+    String title, 
+    String description, 
+    String answer, 
+    bool isAiMade,
+  ) {
+    // Remove listeners temporarily to avoid triggering edit detection
+    questionTitleController.removeListener(_updateTitleState);
+    questionDescriptionController.removeListener(_updateDescriptionState);
+    questionAnswerController.removeListener(_updateAnswerState);
+
+    // Set initial values
+    _initialTitle = title;
+    _initialDescription = description;
+    _initialAnswer = answer;
+    
+    // Update controllers
+    questionTitleController.text = title;
+    questionDescriptionController.text = description;
+    questionAnswerController.text = answer;
+    
+    // Update character counts
+    questionTitleCharCount = title.length;
+    questionDescriptionCharCount = description.length;
+    questionAnswerCharCount = answer.length;
+    
+    // Set AI status
+    aiMade = isAiMade;
+    _hasBeenEdited = false;
+
+    // Restore listeners
+    _setupListeners();
+  }
+
+  void dispose() {
+    questionTitleController.dispose();
+    questionDescriptionController.dispose();
+    questionAnswerController.dispose();
   }
 }
 
@@ -551,12 +959,14 @@ class _QuestionForm extends StatefulWidget {
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final _QuestionFormData questionFormData;
+  final bool showAIBadge;
 
   const _QuestionForm({
     required this.questionFormData,
     required this.onRemove,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.showAIBadge,
     Key? key,
   }) : super(key: key);
 
@@ -568,10 +978,38 @@ class _QuestionFormState extends State<_QuestionForm> {
   bool _isExpanded = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Add listeners to all controllers
+    widget.questionFormData.questionTitleController.addListener(_updateState);
+    widget.questionFormData.questionDescriptionController.addListener(_updateState);
+    widget.questionFormData.questionAnswerController.addListener(_updateState);
+    
+    // Set the edit callback
+    widget.questionFormData.onEdit = _updateState;
+  }
+
+  void _updateState() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    // Clean up listeners
+    widget.questionFormData.questionTitleController.removeListener(_updateState);
+    widget.questionFormData.questionDescriptionController.removeListener(_updateState);
+    widget.questionFormData.questionAnswerController.removeListener(_updateState);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final question = widget.questionFormData;
     final hasTitleError = question.questionTitleController.text.isEmpty;
     final hasAnswerError = question.questionAnswerController.text.isEmpty;
+    final showAIBadge =  question.aiMade && !question._hasBeenEdited;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -585,17 +1023,49 @@ class _QuestionFormState extends State<_QuestionForm> {
       ),
       child: Column(
         children: [
-          // Header row with question number and action buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Show number only when expanded, number + title when compressed
               _isExpanded
-                  ? Text("Question ${question.index}")
+                  ? Row(
+                      children: [
+                        Text("Question ${question.index}"),
+                        if (showAIBadge)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Tooltip(
+                              message: 'AI Generated',
+                              child: Text(
+                                'AI',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
                   : Expanded(
                       child: Row(
                         children: [
                           Text("Question ${question.index}: "),
+                          if (showAIBadge)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Tooltip(
+                                message: 'AI Generated',
+                                child: Text(
+                                  'AI',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ),
+                            ),
                           Expanded(
                             child: Text(
                               question.questionTitleController.text.isEmpty
@@ -642,7 +1112,6 @@ class _QuestionFormState extends State<_QuestionForm> {
               ),
             ],
           ),
-          // The question content that can be collapsed
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             child: _isExpanded
@@ -652,6 +1121,11 @@ class _QuestionFormState extends State<_QuestionForm> {
                       TextField(
                         controller: question.questionTitleController,
                         maxLength: question.maxQuestionTitleLength,
+                        onChanged: (value) {
+                          if (question.aiMade && !question._hasBeenEdited) {
+                            setState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           labelText: "Question Title*",
                           hintText: "Enter the question title here",
@@ -667,6 +1141,11 @@ class _QuestionFormState extends State<_QuestionForm> {
                         controller: question.questionDescriptionController,
                         maxLength: question.maxQuestionDescriptionLength,
                         maxLines: 5,
+                        onChanged: (value) {
+                          if (question.aiMade && !question._hasBeenEdited) {
+                            setState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           labelText: "Question Description",
                           hintText: "Enter the question description here",
@@ -680,6 +1159,11 @@ class _QuestionFormState extends State<_QuestionForm> {
                       TextField(
                         controller: question.questionAnswerController,
                         maxLength: question.maxQuestionAnswerLength,
+                        onChanged: (value) {
+                          if (question.aiMade && !question._hasBeenEdited) {
+                            setState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           labelText: "Answer*",
                           hintText: "Enter the answer here",
@@ -692,7 +1176,7 @@ class _QuestionFormState extends State<_QuestionForm> {
                       ),
                     ],
                   )
-                : const SizedBox.shrink(), // No extra content when compressed
+                : const SizedBox.shrink(),
           ),
         ],
       ),

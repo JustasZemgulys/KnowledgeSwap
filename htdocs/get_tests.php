@@ -36,6 +36,7 @@ try {
             t.visibility,
             t.fk_resource,
             t.fk_user,
+			t.ai_made,
             COUNT(q.id) as question_count
         FROM test t
         LEFT JOIN question q ON q.fk_test = t.id
@@ -64,8 +65,10 @@ try {
             'description' => $row['description'],
             'creation_date' => $row['creation_date'],
             'has_resource' => !empty($row['fk_resource']),
+			'fk_resource' => $row['fk_resource'],
             'question_count' => (int)$row['question_count'],
             'is_owner' => ($row['fk_user'] == $userId),
+			'ai_made' => (bool)$row['ai_made'],
 			'fk_user' => $row['fk_user'],
             'visibility' => (bool)$row['visibility']
         ];

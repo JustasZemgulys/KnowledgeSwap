@@ -12,11 +12,13 @@ import 'package:universal_html/html.dart' as html; // For web download functiona
 class ResourceScreen extends StatefulWidget {
   final int initialPage;
   final String initialSort;
+  final bool selectMode;
 
   const ResourceScreen({
     super.key,
     this.initialPage = 1,
     this.initialSort = 'desc',
+    this.selectMode = false,
   });
 
 
@@ -48,7 +50,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       serverIP = await getUserIP();
       _fetchResources();
     } catch (e) {
-      print('Error initializing server IP: $e');
+      //print('Error initializing server IP: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error connecting to server: $e')),
       );
@@ -79,7 +81,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
         throw Exception('Server returned status code ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching resources: $e');
+      //print('Error fetching resources: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading resources: $e')),
       );
@@ -104,7 +106,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
     _fetchResources();
   }
 
-
   Future<void> _downloadResource(String resourcePath, String resourceName) async {
     if (resourcePath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +129,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
 
       // Create download link
+      // ignore: unused_local_variable
       final anchor = html.AnchorElement(href: fullUrl)
         ..setAttribute('download', resourceName)
         ..setAttribute('type', mimeType)
@@ -137,7 +139,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
         SnackBar(content: Text('Downloading $resourceName...')),
       );
     } catch (e) {
-      print('Error downloading resource: $e');
+      //print('Error downloading resource: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to download resource: $e')),
       );
@@ -145,16 +147,16 @@ class _ResourceScreenState extends State<ResourceScreen> {
   }
 
   Future<void> _editResource(BuildContext context, Map<String, dynamic> resource) async {
-  final result = await Navigator.pushNamed(
-    context,
-    '/edit-resource',
-    arguments: resource,
-  );
-  
-  if (result == true) {
-    _fetchResources(); // Refresh the list after editing
+    final result = await Navigator.pushNamed(
+      context,
+      '/edit-resource',
+      arguments: resource,
+    );
+    
+    if (result == true) {
+      _fetchResources(); // Refresh the list after editing
+    }
   }
-}
 
   Future<void> _confirmDeleteResource(BuildContext context, int resourceId, String resourceName) async {
     final confirmed = await showDialog<bool>(
@@ -207,137 +209,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
     }
   }
 
-  Widget _buildResourceCard(Map<String, dynamic> resource) {
-    final previewPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
-    final resourcePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
-    final resourceName = resource['name'] ?? 'Untitled Resource';
-    final resourceId = resource['id']; // Get resource ID from the resource data
-    final isOwner = resource['fk_user'] == user_info.id;
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => _downloadResource(resourcePath, resourceName),
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Colors.grey.shade200,
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                            color: Colors.transparent,
-                          ),
-                          child: Center(
-                            child: _buildResourcePreview(previewPath.isNotEmpty ? previewPath : resourcePath, resourceName),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-                          color: Colors.transparent,
-                        ),
-                        padding: EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              resourceName,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.black,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'generate_test',
-                      child: ListTile(
-                        leading: Icon(Icons.quiz, size: 20),
-                        title: Text('Generate Test', style: TextStyle(fontSize: 14)),
-                      ),
-                    ),
-                    if (isOwner) ...[
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit, size: 20),
-                          title: Text('Edit Resource', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                          title: Text('Delete Resource', style: TextStyle(fontSize: 14, color: Colors.red)),
-                        ),
-                      ),
-                    ],
-                  ],
-                  onSelected: (value) async {
-                    if (value == 'generate_test') {
-                      ResourceTestGenerator.navigateToConfigScreen(
-                        context: context,
-                        resourceId: resourceId,
-                        userId: user_info.id,
-                        resourceName: resourceName,
-                      );
-                    } else if (value == 'edit') {
-                      _editResource(context, resource);
-                    } else if (value == 'delete') {
-                      _confirmDeleteResource(context, resourceId, resourceName);
-                    }
-                  },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-  
   Widget _buildResourcePreview(String path, String resourceName) {
     if (path.isEmpty) {
       return Container(
@@ -378,6 +249,249 @@ class _ResourceScreenState extends State<ResourceScreen> {
     );
   }
 
+  Widget _buildResourceCard(Map<String, dynamic> resource) {
+    final previewPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
+    final resourcePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
+    final resourceName = resource['name'] ?? 'Untitled Resource';
+    final resourceId = resource['id'];
+    final isOwner = resource['fk_user'] == user_info.id;
+    final isPrivate = resource['visibility'] == 0 && isOwner;
+
+    // If in selection mode, show a simplified card
+    if (widget.selectMode) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () {
+            Navigator.pop(context, {
+              'id': resourceId,
+              'name': resourceName,
+              'path': resourcePath,
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+              border: Border.all(
+                color: Colors.grey.shade200,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                      color: Colors.transparent,
+                    ),
+                    child: Center(
+                      child: _buildResourcePreview(
+                        previewPath.isNotEmpty ? previewPath : resourcePath, 
+                        resourceName
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+                    color: Colors.transparent,
+                  ),
+                  padding: EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        resourceName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (isPrivate)
+                            Text(
+                              'Private',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Original card implementation for normal mode
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => _downloadResource(resourcePath, resourceName),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.grey.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            color: Colors.transparent,
+                          ),
+                          child: Center(
+                            child: _buildResourcePreview(
+                              previewPath.isNotEmpty ? previewPath : resourcePath, 
+                              resourceName
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+                          color: Colors.transparent,
+                        ),
+                        padding: EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              resourceName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                if (isPrivate)
+                                  Text(
+                                    'Private',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'generate_test',
+                        child: ListTile(
+                          leading: Icon(Icons.quiz, size: 20),
+                          title: Text('Generate Test', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                      if (isOwner) ...[
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit, size: 20),
+                            title: Text('Edit Resource', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                            title: Text('Delete Resource', style: TextStyle(fontSize: 14, color: Colors.red)),
+                          ),
+                        )
+                      ],
+                    ],
+                    onSelected: (value) async {
+                      if (value == 'generate_test') {
+                        ResourceTestGenerator.navigateToConfigScreen(
+                          context: context,
+                          resourceId: resourceId,
+                          userId: user_info.id,
+                          resourceName: resourceName,
+                        );
+                      } else if (value == 'edit') {
+                        _editResource(context, resource);
+                      } else if (value == 'delete') {
+                        _confirmDeleteResource(context, resourceId, resourceName);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -385,61 +499,71 @@ class _ResourceScreenState extends State<ResourceScreen> {
     });
   
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black),
-        actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.pushNamed(
-              context,
-              '/create-resource',
-              arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text("Create Resource"),
-          ),
-          const SizedBox(width: 1),
-          IconButton(
-            icon: Image.asset("assets/usericon.jpg"),
-            onPressed: () => Navigator.pushNamed(context, '/profile'),
-          ),
-        ],
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                const Text('Sort by date: '),
-                DropdownButton<String>(
-                  value: sortOrder,
-                  items: const [
-                    DropdownMenuItem(value: 'desc', child: Text('Newest first')),
-                    DropdownMenuItem(value: 'asc', child: Text('Oldest first')),
-                  ],
-                  onChanged: (value) => _changeSortOrder(value!),
+      appBar: widget.selectMode
+          ? AppBar(
+              title: const Text('Select a Resource'),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            )
+          : AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
+              ),
+              iconTheme: const IconThemeData(color: Colors.black),
+              actions: [
+                TextButton.icon(
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    '/create-resource',
+                    arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text("Create Resource"),
+                ),
+                const SizedBox(width: 1),
+                IconButton(
+                  icon: Image.asset("assets/usericon.jpg"),
+                  onPressed: () => Navigator.pushNamed(context, '/profile'),
                 ),
               ],
+              elevation: 0,
+              backgroundColor: Colors.transparent,
             ),
-          ),
+      body: Column(
+        children: [
+          if (!widget.selectMode) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  const Text('Sort by date: '),
+                  DropdownButton<String>(
+                    value: sortOrder,
+                    items: const [
+                      DropdownMenuItem(value: 'desc', child: Text('Newest first')),
+                      DropdownMenuItem(value: 'asc', child: Text('Oldest first')),
+                    ],
+                    onChanged: (value) => _changeSortOrder(value!),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : resources.isEmpty
                     ? const Center(child: Text('No resources found'))
                     : GridView.builder(
-                        padding: const EdgeInsets.all(20),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 20,
-                          mainAxisSpacing: 20,
-                          childAspectRatio: 0.9,
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: widget.selectMode ? 1 : 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: widget.selectMode ? 1.5 : 0.9,
                         ),
                         itemCount: resources.length,
                         itemBuilder: (context, index) {
@@ -447,27 +571,29 @@ class _ResourceScreenState extends State<ResourceScreen> {
                         },
                       ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: currentPage > 1
-                      ? () => _goToPage(currentPage - 1)
-                      : null,
-                ),
-                Text('Page $currentPage of ${(totalResources / itemsPerPage).ceil()}'),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: currentPage < (totalResources / itemsPerPage).ceil()
-                      ? () => _goToPage(currentPage + 1)
-                      : null,
-                ),
-              ],
+          if (!widget.selectMode) ...[
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: currentPage > 1
+                        ? () => _goToPage(currentPage - 1)
+                        : null,
+                  ),
+                  Text('Page $currentPage of ${(totalResources / itemsPerPage).ceil()}'),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: currentPage < (totalResources / itemsPerPage).ceil()
+                        ? () => _goToPage(currentPage + 1)
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

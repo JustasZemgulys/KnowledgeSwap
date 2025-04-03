@@ -60,20 +60,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Generate questions based on configuration
     $questions = [];
-    foreach ($questionsConfig as $config) {
-        $prompt = "Generate 1 question about {$config['topic']}";
-        $prompt .= " with parameters: {$config['parameters']}";
-        
-        if (!empty($extractedText)) {
-            $prompt .= " Use the following text as reference: $extractedText";
-        }
+    foreach ($questionsConfig as $index => $config) {
+		$prompt = "Generate 1 question about {$config['topic']}";
+		$prompt .= " with parameters: {$config['parameters']}";
+		
+		if (!empty($extractedText)) {
+			$prompt .= " Use the following text as reference: $extractedText";
+		}
 
-        $question = generateQuestionFromPrompt($prompt);
-        if ($question) {
-            $questions[] = $question;
-        }
-        usleep(500000); // Rate limiting
-    }
+		$question = generateQuestionFromPrompt($prompt);
+		if ($question) {
+			$questions[] = [
+				...$question,
+				'original_order' => $config['original_order'] ?? $index
+			];
+		}
+		usleep(500000);
+	}
 
     if (count($questions) < 1) {
         die(json_encode(['success' => false, 'message' => 'Failed to generate questions']));
@@ -83,22 +86,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $testName = "Test: " . substr($resourceName, 0, 50);
     $testDescription = "Generated test based on resource: " . $resourceName;
     
-    $insertTestQuery = "INSERT INTO test (name, description, creation_date, visibility, fk_user, fk_resource) 
-                       VALUES (?, ?, NOW(), 1, ?, ?)";
+    $insertTestQuery = "INSERT INTO test (name, description, creation_date, visibility, fk_user, fk_resource, ai_made) 
+                       VALUES (?, ?, NOW(), 1, ?, ?, 1)";
     $stmt = $conn->prepare($insertTestQuery);
     $stmt->bind_param("ssii", $testName, $testDescription, $userId, $resourceId);
     
     if ($stmt->execute()) {
         $testId = $conn->insert_id;
         
-        // Insert questions
-        foreach ($questions as $q) {
-            $insertQuestionQuery = "INSERT INTO question (name, description, creation_date, visibility, answer, fk_user, fk_test) 
-                                   VALUES (?, ?, NOW(), 1, ?, ?, ?)";
-            $qStmt = $conn->prepare($insertQuestionQuery);
-            $qStmt->bind_param("sssii", $q['title'], $q['description'], $q['answer'], $userId, $testId);
-            $qStmt->execute();
-        }
+        // In the section where you insert questions:
+		foreach ($questions as $q) {
+			$insertQuestionQuery = "INSERT INTO question 
+				(name, description, creation_date, visibility, answer, fk_user, fk_test, ai_made, `index`) 
+				VALUES (?, ?, NOW(), 1, ?, ?, ?, 1, ?)";
+			$qStmt = $conn->prepare($insertQuestionQuery);
+			$originalOrder = $q['original_order'] + 1; // Convert to 1-based index
+			$qStmt->bind_param("sssiii", 
+				$q['title'], 
+				$q['description'], 
+				$q['answer'], 
+				$userId, 
+				$testId,
+				$originalOrder
+			);
+			$qStmt->execute();
+		}
         
         echo json_encode(['success' => true, 'testId' => $testId]);
     } else {

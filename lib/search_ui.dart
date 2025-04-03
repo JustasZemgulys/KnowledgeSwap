@@ -107,6 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
 
       // Create download link
+      // ignore: unused_local_variable
       final anchor = html.AnchorElement(href: fullUrl)
         ..setAttribute('download', resourceName)
         ..setAttribute('type', mimeType)
@@ -281,11 +282,11 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         title: const Text('Search'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _performSearch,
-          ),
-          const SizedBox(width: 8),
+          //IconButton(
+          //  icon: const Icon(Icons.search),
+          //  onPressed: _performSearch,
+          //),
+          //const SizedBox(width: 8),
           IconButton(
             icon: Image.asset("assets/usericon.jpg"),
             onPressed: () {

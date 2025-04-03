@@ -22,6 +22,15 @@ class ResourceTestGenerator {
       final userIP = await getUserIP();
       final url = 'http://$userIP/generate_resource_test.php';
 
+      // Include the original order index from the config screen
+      final questionsWithOrder = questions.asMap().map((index, question) => MapEntry(
+        index,
+        {
+          ...question,
+          'original_order': index, // Preserve the exact order from config screen
+        },
+      )).values.toList();
+
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -29,7 +38,7 @@ class ResourceTestGenerator {
           'resourceId': resourceId,
           'userId': userId,
           'resourceName': resourceName,
-          'questions': questions,
+          'questions': questionsWithOrder,
         }),
       );
 

@@ -89,14 +89,6 @@ class AppRouter {
     }
   }
 
-  static void _saveCurrentRoute(RouteSettings settings) {
-    if (settings.name != null && !settings.name!.startsWith('/create-')) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        WebStorage.saveLastRoute(settings.name!);
-      });
-    }
-  }
-
   // Update manual route tracking
   static void updateCurrentRoute(BuildContext context, String routeName) {
     WebStorage.saveLastRoute(routeName);

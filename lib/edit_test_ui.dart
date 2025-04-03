@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/create_test_ui.dart';
-import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';

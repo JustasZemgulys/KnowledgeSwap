@@ -27,6 +27,7 @@ class _EditResourceScreenState extends State<EditResourceScreen> {
     return CreateResourceScreen(
       // Pass the existing resource data to the create screen
       initialData: widget.resource,
+      isEditMode: true,
     );
   }
 }

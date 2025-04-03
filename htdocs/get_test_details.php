@@ -17,7 +17,7 @@ try {
         $testId = $_GET['id'];
         
         $stmt = $pdo->prepare("
-            SELECT id, name, description, creation_date 
+            SELECT id, name, description, creation_date, ai_made, visibility
             FROM test 
             WHERE id = ?
         ");
