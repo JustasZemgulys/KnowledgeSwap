@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/resource_test_generator.dart';
+import 'package:knowledgeswap/voting_system.dart';
 import 'package:knowledgeswap/web_storage.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
@@ -266,6 +267,8 @@ class _ResourceScreenState extends State<ResourceScreen> {
     final resourceId = resource['id'];
     final isOwner = resource['fk_user'] == user_info.id;
     final isPrivate = resource['visibility'] == 0 && isOwner;
+    int localScore = resource['score'] ?? 0;
+    int? localUserVote = resource['user_vote'];
 
     // If in selection mode, show a simplified card
     if (widget.selectMode) {
@@ -362,7 +365,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       );
     }
 
-    // Original card implementation for normal mode
+    // Original card implementation for normal mode with voting
     return StatefulBuilder(
       builder: (context, setState) {
         return MouseRegion(
@@ -449,6 +452,97 @@ class _ResourceScreenState extends State<ResourceScreen> {
                     ],
                   ),
                 ),
+                // Voting buttons in top-left corner
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.arrow_upward,
+                              color: localUserVote == 1 ? Colors.orange : Colors.grey,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              final newVote = localUserVote == 1 ? null : 1;
+                              final scoreChange = newVote == null ? -1 : (localUserVote == -1 ? 2 : 1);
+                              
+                              // Immediate UI update
+                              setState(() {
+                                localUserVote = newVote;
+                                localScore = localScore + scoreChange;
+                              });
+
+                              // Send to server
+                              VotingController(
+                                context: context,
+                                itemType: 'resource',
+                                itemId: resourceId,
+                                currentScore: localScore,
+                                onScoreUpdated: (newScore) {
+                                  // This is just a fallback in case server response differs
+                                  if (mounted) {
+                                    setState(() {
+                                      resource['score'] = newScore;
+                                      resource['user_vote'] = newVote;
+                                    });
+                                  }
+                                },
+                              ).upvote();
+                            },
+                          ),
+                          Text(localScore.toString()),
+                          IconButton(
+                            icon: Icon(
+                              Icons.arrow_downward,
+                              color: localUserVote == -1 ? Colors.blue : Colors.grey,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              final newVote = localUserVote == -1 ? null : -1;
+                              final scoreChange = newVote == null ? 1 : (localUserVote == 1 ? -2 : -1);
+                              
+                              // Immediate UI update
+                              setState(() {
+                                localUserVote = newVote;
+                                localScore = localScore + scoreChange;
+                              });
+
+                              // Send to server
+                              VotingController(
+                                context: context,
+                                itemType: 'resource',
+                                itemId: resourceId,
+                                currentScore: localScore,
+                                onScoreUpdated: (newScore) {
+                                  if (mounted) {
+                                    setState(() {
+                                      resource['score'] = newScore;
+                                      resource['user_vote'] = newVote;
+                                    });
+                                  }
+                                },
+                              ).downvote();
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
                 Positioned(
                   top: 8,
                   right: 8,
@@ -462,7 +556,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
                           title: Text('Generate Test', style: TextStyle(fontSize: 14)),
                         ),
                       ),
-                      const PopupMenuItem( // Always available option
+                      const PopupMenuItem(
                         value: 'discussions',
                         child: ListTile(
                           leading: Icon(Icons.forum, size: 20),
@@ -519,6 +613,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -4,6 +4,7 @@ import 'package:knowledgeswap/edit_resource_ui.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
+import 'package:knowledgeswap/voting_system.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
@@ -134,103 +135,171 @@ class _SearchScreenState extends State<SearchScreen> {
     final isTest = item['type'] == 'test';
     final itemId = item['id'];
     final isPrivate = item['visibility'] == 0;
+    final score = item['score'] ?? 0;
+    final userVote = item['user_vote']; // 1 for upvote, -1 for downvote, null for no vote
 
     return Card(
       margin: const EdgeInsets.all(8.0),
-      child: ListTile(
-        title: Text(item['name'] ?? 'Untitled'),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${isTest ? 'Test' : 'Resource'} • Created: ${item['creation_date']}'),
-            Text('By: ${item['creator_name'] ?? 'Unknown'}'),
-            if (isPrivate) Text('Private', style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          itemBuilder: (context) => [
-            if (isTest)
-              const PopupMenuItem(
-                value: 'take_test',
-                child: Text('Take Test'),
-              ),
-            if (!isTest)
-              const PopupMenuItem(
-                value: 'download',
-                child: Text('Download'),
-              ),
-            const PopupMenuItem(
-              value: 'discussions',
-              child: ListTile(
-                leading: Icon(Icons.forum, size: 20),
-                title: Text('View Discussions', style: TextStyle(fontSize: 14)),
-              ),
+      child: Row(
+        children: [
+          // Voting buttons column
+          Container(
+            width: 40,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    Icons.arrow_upward,
+                    color: userVote == 1 ? Colors.orange : Colors.grey,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    VotingController(
+                      context: context,
+                      itemType: isTest ? 'test' : 'resource',
+                      itemId: itemId,
+                      currentScore: score,
+                      onScoreUpdated: (newScore) {
+                        setState(() {
+                          item['score'] = newScore;
+                          item['user_vote'] = userVote == 1 ? null : 1;
+                        });
+                      },
+                    ).upvote();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                Text(
+                  score.toString(),
+                  style: const TextStyle(fontSize: 14),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.arrow_downward,
+                    color: userVote == -1 ? Colors.blue : Colors.grey,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    VotingController(
+                      context: context,
+                      itemType: isTest ? 'test' : 'resource',
+                      itemId: itemId,
+                      currentScore: score,
+                      onScoreUpdated: (newScore) {
+                        setState(() {
+                          item['score'] = newScore;
+                          item['user_vote'] = userVote == -1 ? null : -1;
+                        });
+                      },
+                    ).downvote();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
             ),
-            if (isOwner) ...[
-              const PopupMenuItem(
-                value: 'edit',
-                child: Text('Edit'),
+          ),
+          // Main content
+          Expanded(
+            child: ListTile(
+              title: Text(item['name'] ?? 'Untitled'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${isTest ? 'Test' : 'Resource'} • Created: ${item['creation_date']}'),
+                  Text('By: ${item['creator_name'] ?? 'Unknown'}'),
+                  if (isPrivate) Text('Private', style: TextStyle(color: Colors.grey)),
+                ],
               ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete', style: TextStyle(color: Colors.red)),
+              trailing: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                itemBuilder: (context) => [
+                  if (isTest)
+                    const PopupMenuItem(
+                      value: 'take_test',
+                      child: Text('Take Test'),
+                    ),
+                  if (!isTest)
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Text('Download'),
+                    ),
+                  const PopupMenuItem(
+                    value: 'discussions',
+                    child: ListTile(
+                      leading: Icon(Icons.forum, size: 20),
+                      title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                  if (isOwner) ...[
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ],
+                onSelected: (value) async {
+                  if (value == 'take_test') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TakeTestScreen(testId: itemId),
+                      ),
+                    );
+                  } else if (value == 'download') {
+                    await _downloadResource(item);
+                  } else if (value == 'edit') {
+                    if (isTest) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditTestScreen(test: item),
+                        ),
+                      ).then((_) => _performSearch());
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditResourceScreen(resource: item),
+                        ),
+                      ).then((_) => _performSearch());
+                    }
+                  } else if (value == 'delete') {
+                    _confirmDeleteItem(context, itemId, item['name'], isTest);
+                  } else if (value == 'discussions') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DiscussionScreen(
+                          itemId: itemId,
+                          itemType: isTest ? 'test' : 'resource',
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
-            ],
-          ],
-          onSelected: (value) async {
-            if (value == 'take_test') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TakeTestScreen(testId: itemId),
-                ),
-              );
-            } else if (value == 'download') {
-              await _downloadResource(item);
-            } else if (value == 'edit') {
-              if (isTest) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditTestScreen(test: item),
-                  ),
-                ).then((_) => _performSearch());
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditResourceScreen(resource: item),
-                  ),
-                ).then((_) => _performSearch());
-              }
-            } else if (value == 'delete') {
-              _confirmDeleteItem(context, itemId, item['name'], isTest);
-            }  else if (value == 'discussions') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DiscussionScreen(
-                    itemId: itemId,
-                    itemType: 'test',
-                  ),
-                ),
-              );
-            }
-          },
-        ),
-        onTap: () {
-          if (isTest) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TakeTestScreen(testId: itemId),
-              ),
-            );
-          } else {
-            _downloadResource(item);
-          }
-        },
+              onTap: () {
+                if (isTest) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TakeTestScreen(testId: itemId),
+                    ),
+                  );
+                } else {
+                  _downloadResource(item);
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

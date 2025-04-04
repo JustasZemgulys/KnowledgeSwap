@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/voting_system.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -71,7 +72,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
   Future<void> _fetchComments() async {
     try {
       final response = await http.get(Uri.parse(
-          'http://$serverIP/get_comments.php?item_id=${widget.itemId}&item_type=${widget.itemType}'));
+        'http://$serverIP/get_comments.php?item_id=${widget.itemId}&item_type=${widget.itemType}&user_id=${userInfo.id}'));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -275,11 +276,11 @@ Future<void> _postComment() async {
   }
 
   String _getParentCommentName(int parentId) {
-    print("parentId $parentId");
+    //print("parentId $parentId");
     try {
       // Search through all comments to find the parent
       for (var comment in comments) {
-        print("comment['id'] ${comment['id']}");
+        //print("comment['id'] ${comment['id']}");
         if (comment['id'] == parentId) {
           // Return the name if user exists, otherwise '[deleted]'
           return comment['name'];
@@ -361,170 +362,239 @@ Future<void> _postComment() async {
     }
   }
 
-  Widget _buildCommentItem(dynamic comment) {
-    final isDeleted = comment['is_deleted'] == true || comment['user_exists'] == false;
-    final isAuthor = comment['fk_user'] == userInfo.id;
-    final name = isDeleted ? '[deleted]' : comment['name']?.toString() ?? 'Unknown';
-    final text = isDeleted ? '[deleted]' : comment['text']?.toString() ?? '';
-    final date = comment['creation_date']?.toString() ?? '';
-    final isReply = comment['parent_id'] != null;
-    final parentUsername = isReply ? _getParentCommentName(comment['parent_id']) : null;
-    
-    // Check if this comment should offer minimize option
-    final shouldOfferMinimize = text.length > _minimizeThreshold || 
-        comments.any((c) => c['parent_id'] == comment['id']);
-    final isMinimized = _minimizedComments[comment['id']] ?? false;
+Widget _buildCommentItem(dynamic comment) {
+  final isDeleted = comment['is_deleted'] == true || comment['user_exists'] == false;
+  final isAuthor = comment['fk_user'] == userInfo.id;
+  final name = isDeleted ? '[deleted]' : comment['name']?.toString() ?? 'Unknown';
+  final text = isDeleted ? '[deleted]' : comment['text']?.toString() ?? '';
+  final date = comment['creation_date']?.toString() ?? '';
+  final isReply = comment['parent_id'] != null;
+  final parentUsername = isReply ? _getParentCommentName(comment['parent_id']) : null;
+  final score = comment['score'] ?? 0;
+  final userVote = comment['user_vote']; // 1 for upvote, -1 for downvote, null for no vote
+  
+  // Check if this comment should offer minimize option
+  final shouldOfferMinimize = text.length > _minimizeThreshold || 
+      comments.any((c) => c['parent_id'] == comment['id']);
+  final isMinimized = _minimizedComments[comment['id']] ?? false;
 
-    return Card(
-      margin: EdgeInsets.only(
-        left: isReply ? 40.0 : 8.0,
-        top: 8.0,
-        right: 8.0,
-        bottom: 8.0,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundImage: isDeleted 
-                      ? const AssetImage('assets/usericon.jpg') as ImageProvider
-                      : (comment['user_image'] != null && comment['user_image'] != "default"
-                          ? NetworkImage(comment['user_image'])
-                          : const AssetImage('assets/usericon.jpg')) as ImageProvider,
+  return Card(
+    margin: EdgeInsets.only(
+      left: isReply ? 40.0 : 8.0,
+      top: 8.0,
+      right: 8.0,
+      bottom: 8.0,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Voting buttons column
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_upward,
+                  color: userVote == 1 ? Colors.orange : Colors.grey,
+                  size: 20,
                 ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          _formatDate(date),
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                        if (comment['last_edit_date'] != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            "edited: " + _formatDate(comment['last_edit_date']),
-                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                if (shouldOfferMinimize)
-                  IconButton(
-                    icon: Icon(isMinimized ? Icons.expand_more : Icons.expand_less),
-                    onPressed: () {
+                onPressed: isDeleted ? null : () {
+                  VotingController(
+                    context: context,
+                    itemType: 'comment',
+                    itemId: comment['id'],
+                    currentScore: score,
+                    onScoreUpdated: (newScore) {
                       setState(() {
-                        _minimizedComments[comment['id']] = !isMinimized;
+                        comment['score'] = newScore;
+                        comment['user_vote'] = userVote == 1 ? null : 1;
                       });
                     },
-                  ),
-                if (isAuthor && !isDeleted)
-                  PopupMenuButton(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _editComment(comment['id'], text);
-                      } else if (value == 'delete') {
-                        _deleteComment(comment['id']);
-                      }
+                  ).upvote();
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              Text(
+                score.toString(),
+                style: const TextStyle(fontSize: 14),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_downward,
+                  color: userVote == -1 ? Colors.blue : Colors.grey,
+                  size: 20,
+                ),
+                onPressed: isDeleted ? null : () {
+                  VotingController(
+                    context: context,
+                    itemType: 'comment',
+                    itemId: comment['id'],
+                    currentScore: score,
+                    onScoreUpdated: (newScore) {
+                      setState(() {
+                        comment['score'] = newScore;
+                        comment['user_vote'] = userVote == -1 ? null : -1;
+                      });
                     },
+                  ).downvote();
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          // Rest of the comment content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: isDeleted 
+                          ? const AssetImage('assets/usericon.jpg') as ImageProvider
+                          : (comment['user_image'] != null && comment['user_image'] != "default"
+                              ? NetworkImage(comment['user_image'])
+                              : const AssetImage('assets/usericon.jpg')) as ImageProvider,
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              _formatDate(date),
+                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                            ),
+                            if (comment['last_edit_date'] != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                "edited: " + _formatDate(comment['last_edit_date']),
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    if (shouldOfferMinimize)
+                      IconButton(
+                        icon: Icon(isMinimized ? Icons.expand_more : Icons.expand_less),
+                        onPressed: () {
+                          setState(() {
+                            _minimizedComments[comment['id']] = !isMinimized;
+                          });
+                        },
+                      ),
+                    if (isAuthor && !isDeleted)
+                      PopupMenuButton(
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            _editComment(comment['id'], text);
+                          } else if (value == 'delete') {
+                            _deleteComment(comment['id']);
+                          }
+                        },
+                      ),
+                  ],
+                ),
+                if (isReply && parentUsername != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Replying to @$parentUsername',
+                    style: TextStyle(
+                      color: Colors.blue[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                if (!isMinimized)
+                  Html(
+                    data: text,
+                    onLinkTap: (url, _, __) {
+                      if (url != null) launchUrl(Uri.parse(url));
+                    },
+                  ),
+                if (isMinimized)
+                  Text(
+                    text.length > 50 ? '${text.substring(0, 50)}...' : text,
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                const SizedBox(height: 8),
+                if (!isDeleted && !isMinimized)
+                  TextButton(
+                    onPressed: () => _handleReply(comment['id'], name),
+                    child: const Text('Reply'),
                   ),
               ],
             ),
-            if (isReply && parentUsername != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Replying to @$parentUsername',
-                style: TextStyle(
-                  color: Colors.blue[600],
-                  fontSize: 12,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            if (!isMinimized)
-              Html(
-                data: text,
-                onLinkTap: (url, _, __) {
-                  if (url != null) launchUrl(Uri.parse(url));
-                },
-              ),
-            if (isMinimized)
-              Text(
-                text.length > 50 ? '${text.substring(0, 50)}...' : text,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            const SizedBox(height: 8),
-            if (!isDeleted && !isMinimized)
-              TextButton(
-                onPressed: () => _handleReply(comment['id'], name),
-                child: const Text('Reply'),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-Widget _buildNestedComments(List<dynamic> allComments, {int? parentId, int depth = 0}) {
-  final childComments = allComments.where((c) => 
-    (parentId == null && c['parent_id'] == null) || 
-    (parentId != null && c['parent_id'] == parentId)
-  ).toList();
-  
-  if (childComments.isEmpty) return const SizedBox();
-
-  return Column(
-    children: [
-      for (final comment in childComments) ...[
-        Container(
-          decoration: depth > 0
-              ? BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: Colors.grey[300]!,
-                      width: 2.0,
-                    ),
-                  ),
-                )
-              : null,
-          padding: EdgeInsets.only(left: depth * 16.0),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: _buildCommentItem(comment),
           ),
-        ),
-        if (!(_minimizedComments[comment['id']] ?? false))
-          _buildNestedComments(allComments, parentId: comment['id'], depth: depth + 1),
-      ],
-    ],
+        ],
+      ),
+    ),
   );
 }
+
+
+  Widget _buildNestedComments(List<dynamic> allComments, {int? parentId, int depth = 0}) {
+    final childComments = allComments.where((c) => 
+      (parentId == null && c['parent_id'] == null) || 
+      (parentId != null && c['parent_id'] == parentId)
+    ).toList();
+    
+    if (childComments.isEmpty) return const SizedBox();
+
+    return Column(
+      children: [
+        for (final comment in childComments) ...[
+          Container(
+            decoration: depth > 0
+                ? BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 2.0,
+                      ),
+                    ),
+                  )
+                : null,
+            padding: EdgeInsets.only(left: depth * 16.0),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: _buildCommentItem(comment),
+            ),
+          ),
+          if (!(_minimizedComments[comment['id']] ?? false))
+            _buildNestedComments(allComments, parentId: comment['id'], depth: depth + 1),
+        ],
+      ],
+    );
+  }
+    
   @override
   Widget build(BuildContext context) {
     return Scaffold(

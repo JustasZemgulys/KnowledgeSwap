@@ -28,29 +28,32 @@ try {
     }
 
     $testQuery = "
-        SELECT 
-            t.id,
-            t.name,
-            t.description,
-            t.creation_date,
-            t.visibility,
-            t.fk_resource,
-            t.fk_user,
+		SELECT 
+			t.id,
+			t.name,
+			t.description,
+			t.creation_date,
+			t.visibility,
+			t.fk_resource,
+			t.fk_user,
 			t.ai_made,
-            COUNT(q.id) as question_count
-        FROM test t
-        LEFT JOIN question q ON q.fk_test = t.id
-        WHERE (t.visibility = 1 OR t.fk_user = ?)
-        GROUP BY t.id
-        ORDER BY t.creation_date DESC
-    ";
+			t.score,
+			v.direction as user_vote,
+			COUNT(q.id) as question_count
+		FROM test t
+		LEFT JOIN question q ON q.fk_test = t.id
+		LEFT JOIN vote v ON v.fk_item = t.id AND v.fk_type = 'test' AND v.fk_user = ?
+		WHERE (t.visibility = 1 OR t.fk_user = ?)
+		GROUP BY t.id
+		ORDER BY t.creation_date DESC
+	";
 
     $stmt = $conn->prepare($testQuery);
     if (!$stmt) {
         throw new Exception("Database query preparation failed");
     }
     
-    $stmt->bind_param("i", $userId);
+    $stmt->bind_param("ii", $userId, $userId);
     if (!$stmt->execute()) {
         throw new Exception("Query execution failed");
     }
@@ -69,8 +72,11 @@ try {
             'question_count' => (int)$row['question_count'],
             'is_owner' => ($row['fk_user'] == $userId),
 			'ai_made' => (bool)$row['ai_made'],
+			'score' => $row['score'],
 			'fk_user' => $row['fk_user'],
-            'visibility' => (bool)$row['visibility']
+            'visibility' => (bool)$row['visibility'],
+			'score' => (int)$row['score'],
+			'user_vote' => $row['user_vote'] ? (int)$row['user_vote'] : null,
         ];
     }
 

@@ -4,6 +4,7 @@ import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/create_test_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
+import 'package:knowledgeswap/voting_system.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
@@ -143,183 +144,229 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
 
-  Widget _buildTestCard(Map<String, dynamic> test) {
-    final isOwner = test['fk_user'] == user_info.id;
-    final testId = test['id'];
-    final testName = test['name'] ?? 'Untitled Test';
-    final hasResource = test['has_resource'] ?? false;
-    final isPrivate = !(test['visibility'] ?? true);
-    final isAIMade = test['ai_made'] ?? false;
+Widget _buildTestCard(Map<String, dynamic> test) {
+  final isOwner = test['fk_user'] == user_info.id;
+  final testId = test['id'];
+  final testName = test['name'] ?? 'Untitled Test';
+  final hasResource = test['has_resource'] ?? false;
+  final isPrivate = !(test['visibility'] ?? true);
+  final isAIMade = test['ai_made'] ?? false;
+  final score = test['score'] ?? 0; // Make sure your test model includes score
+  final userVote = test['user_vote']; // This should come from your API
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TakeTestScreen(testId: test['id']),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Stack(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title row with icons moved to the left
-                  Row(
-                    children: [
-                      // Status indicators container moved before the title
-                      if (hasResource || (isPrivate && isOwner) || isAIMade)
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (hasResource)
-                                const Padding(
-                                  padding: EdgeInsets.only(right: 4),
-                                  child: Icon(Icons.attachment, 
-                                    color: Colors.blue, 
-                                    size: 20),
-                                ),
-                              if (isPrivate && isOwner)
-                                Container(
-                                  child: const Text(
-                                    'Private',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              if (isAIMade)
-                                Tooltip(
-                                  message: 'AI Generated Test',
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.blue, width: 1),
-                                    ),
-                                    child: const Text(
-                                      'AI',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      Expanded(
-                        child: Text(
-                          testName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    test['description'] ?? 'No description',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Questions: ${test['question_count']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      Text(
-                        'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              // Dropdown menu
-              Positioned(
-                top: 0,
-                right: 0,
-                child: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, 
-                    color: Colors.grey[600], 
-                    size: 20),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem( // Always available option
-                      value: 'discussions',
-                      child: ListTile(
-                        leading: Icon(Icons.forum, size: 20),
-                        title: Text('View Discussions', style: TextStyle(fontSize: 14)),
-                      ),
-                    ),
-                    if (isOwner) // Owner-specific options
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit, size: 20),
-                          title: Text('Edit Test', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                    if (isOwner) // Owner-specific options
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                          title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
-                        ),
-                      ),
-                  ],
-                  onSelected: (value) async {
-                    if (value == 'edit') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditTestScreen(test: test),
-                        ),
-                      ).then((_) => _fetchTests());
-                    } else if (value == 'delete') {
-                      _confirmDeleteTest(context, testId, testName);
-                    } else if (value == 'discussions') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DiscussionScreen(
-                            itemId: testId,
-                            itemType: 'test',
-                          ),
-                        ),
-                      );
-                    }
+  return Card(
+    elevation: 2,
+    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    child: InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TakeTestScreen(testId: test['id']),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Add voting widget here
+                Consumer<UserInfoProvider>(
+                  builder: (context, userProvider, child) {
+                    return VotingWidget(
+                      score: score,
+                      userVote: userVote,
+                      onUpvote: () {
+                        VotingController(
+                          context: context,
+                          itemType: 'test',
+                          itemId: testId,
+                          currentScore: score,
+                          onScoreUpdated: (newScore) {
+                            setState(() {
+                              test['score'] = newScore;
+                              test['user_vote'] = 1;
+                            });
+                          },
+                        ).upvote();
+                      },
+                      onDownvote: () {
+                        VotingController(
+                          context: context,
+                          itemType: 'test',
+                          itemId: testId,
+                          currentScore: score,
+                          onScoreUpdated: (newScore) {
+                            setState(() {
+                              test['score'] = newScore;
+                              test['user_vote'] = -1;
+                            });
+                          },
+                        ).downvote();
+                      },
+                    );
                   },
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title row with icons moved to the left
+                      Row(
+                        children: [
+                          // Status indicators container moved before the title
+                          if (hasResource || (isPrivate && isOwner) || isAIMade)
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (hasResource)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 4),
+                                      child: Icon(Icons.attachment, 
+                                        color: Colors.blue, 
+                                        size: 20),
+                                    ),
+                                  if (isPrivate && isOwner)
+                                    Container(
+                                      child: const Text(
+                                        'Private',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  if (isAIMade)
+                                    Tooltip(
+                                      message: 'AI Generated Test',
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.blue, width: 1),
+                                        ),
+                                        child: const Text(
+                                          'AI',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          Expanded(
+                            child: Text(
+                              testName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        test['description'] ?? 'No description',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Questions: ${test['question_count']}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          Text(
+                            'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Dropdown menu
+            Positioned(
+              top: 0,
+              right: 0,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, 
+                  color: Colors.grey[600], 
+                  size: 20),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'discussions',
+                    child: ListTile(
+                      leading: Icon(Icons.forum, size: 20),
+                      title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                  if (isOwner)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit, size: 20),
+                        title: Text('Edit Test', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                  if (isOwner)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                        title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
+                      ),
+                    ),
+                ],
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditTestScreen(test: test),
+                      ),
+                    ).then((_) => _fetchTests());
+                  } else if (value == 'delete') {
+                    _confirmDeleteTest(context, testId, testName);
+                  } else if (value == 'discussions') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DiscussionScreen(
+                          itemId: testId,
+                          itemType: 'test',
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-    
-  
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -37,11 +37,14 @@ try {
                 r.fk_user,
                 r.visibility,
                 r.resource_link,
-				r.resource_photo_link,
+                r.resource_photo_link,
+                r.score,
+                v.direction as user_vote,
                 'resource' as type,
                 u.name as creator_name
             FROM resource r
             LEFT JOIN user u ON r.fk_user = u.id
+            LEFT JOIN vote v ON v.fk_item = r.id AND v.fk_type = 'resource' AND v.fk_user = ?
             WHERE r.name LIKE ? 
             AND (r.visibility = 1 OR r.fk_user = ?)";
     
@@ -52,11 +55,14 @@ try {
                 t.creation_date,
                 t.fk_user,
                 t.visibility,
-				t.fk_resource, 	
+                t.fk_resource,
+                t.score,
+                v.direction as user_vote,
                 'test' as type,
                 u.name as creator_name
             FROM test t
             LEFT JOIN user u ON t.fk_user = u.id
+            LEFT JOIN vote v ON v.fk_item = t.id AND v.fk_type = 'test' AND v.fk_user = ?
             WHERE t.name LIKE ?
             AND (t.visibility = 1 OR t.fk_user = ?)";
     
@@ -107,7 +113,7 @@ try {
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
-        $stmt->bind_param("siii", $searchParam, $userId, $offset, $perPage);
+        $stmt->bind_param("isiii", $userId, $searchParam, $userId, $offset, $perPage);
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
         }
@@ -121,7 +127,7 @@ try {
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
-        $stmt->bind_param("siii", $searchParam, $userId, $offset, $perPage);
+        $stmt->bind_param("isiii", $userId, $searchParam, $userId, $offset, $perPage);
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
         }

@@ -31,20 +31,23 @@ try {
     $total = (int)$totalResult->fetch_assoc()['total'];
     $totalStmt->close();
 
-    // Get resources with pagination
+    // Get resources with pagination and voting info
     $resourcesQuery = "
         SELECT
-            id,
-            name,
-            description,
-            creation_date,
-            resource_photo_link,
-            resource_link,
-            visibility,
-            fk_user
-        FROM resource
-        WHERE visibility = 1 OR (visibility = 0 AND fk_user = ?)
-        ORDER BY creation_date $sort
+            r.id,
+            r.name,
+            r.description,
+            r.creation_date,
+            r.resource_photo_link,
+            r.resource_link,
+            r.visibility,
+            r.fk_user,
+            r.score,
+            v.direction as user_vote
+        FROM resource r
+        LEFT JOIN vote v ON v.fk_item = r.id AND v.fk_type = 'resource' AND v.fk_user = ?
+        WHERE r.visibility = 1 OR (r.visibility = 0 AND r.fk_user = ?)
+        ORDER BY r.creation_date $sort
         LIMIT ?, ?
     ";
     
@@ -52,7 +55,7 @@ try {
     if (!$stmt) throw new Exception("Prepare failed: " . $conn->error);
     
     $offset = ($page - 1) * $perPage;
-    $stmt->bind_param("iii", $userId, $offset, $perPage);
+    $stmt->bind_param("iiii", $userId, $userId, $offset, $perPage);
     $stmt->execute();
     $result = $stmt->get_result();
 
