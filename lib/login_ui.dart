@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'forgot_pass_ui.dart';
-import 'AppRouter.dart';
+import 'approuter.dart';
 import 'get_ip.dart';
 
 class LoginPage extends StatefulWidget {

@@ -13,33 +13,46 @@ try {
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 6;
     $sort = in_array(strtoupper($_GET['sort'] ?? ''), ['ASC', 'DESC']) ? $_GET['sort'] : 'DESC';
-    $offset = ($page - 1) * $perPage;
+    $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 
     $conn = new mysqli($servername, $username, $password, $dbname);
     if ($conn->connect_error) {
         throw new Exception("Database connection failed: " . $conn->connect_error);
     }
 
-    $totalResult = $conn->query("SELECT COUNT(*) as total FROM resource");
-    if (!$totalResult) throw new Exception("Count query failed: " . $conn->error);
+    // Count total visible resources
+    $totalQuery = "SELECT COUNT(*) as total FROM resource 
+                  WHERE visibility = 1 OR (visibility = 0 AND fk_user = ?)";
+    $totalStmt = $conn->prepare($totalQuery);
+    if (!$totalStmt) throw new Exception("Count prepare failed: " . $conn->error);
+    $totalStmt->bind_param("i", $userId);
+    $totalStmt->execute();
+    $totalResult = $totalStmt->get_result();
     $total = (int)$totalResult->fetch_assoc()['total'];
+    $totalStmt->close();
 
-    $stmt = $conn->prepare("
+    // Get resources with pagination
+    $resourcesQuery = "
         SELECT
             id,
             name,
             description,
             creation_date,
             resource_photo_link,
-			resource_link,
-			visibility,
-			fk_user
+            resource_link,
+            visibility,
+            fk_user
         FROM resource
+        WHERE visibility = 1 OR (visibility = 0 AND fk_user = ?)
         ORDER BY creation_date $sort
         LIMIT ?, ?
-    ");
+    ";
+    
+    $stmt = $conn->prepare($resourcesQuery);
     if (!$stmt) throw new Exception("Prepare failed: " . $conn->error);
-    $stmt->bind_param("ii", $offset, $perPage);
+    
+    $offset = ($page - 1) * $perPage;
+    $stmt->bind_param("iii", $userId, $offset, $perPage);
     $stmt->execute();
     $result = $stmt->get_result();
 

@@ -1,4 +1,3 @@
-// app_router.dart
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
 import 'package:knowledgeswap/resource_ui.dart';

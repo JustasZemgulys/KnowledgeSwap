@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/resource_test_generator.dart';
 import 'package:knowledgeswap/web_storage.dart';
 import 'package:provider/provider.dart';
@@ -65,13 +68,20 @@ class _ResourceScreenState extends State<ResourceScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder');
+      final url = Uri.parse('http://$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
 
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         totalResources = int.tryParse(data['total'].toString()) ?? 0;
+        
+        // If we got an empty page but it's not the first page, try previous pages
+        if (data['resources'].isEmpty && currentPage > 1) {
+          currentPage--;
+          _fetchResources();
+          return;
+        }
 
         setState(() {
           resources = List<dynamic>.from(data['resources']);
@@ -81,7 +91,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
         throw Exception('Server returned status code ${response.statusCode}');
       }
     } catch (e) {
-      //print('Error fetching resources: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading resources: $e')),
       );
@@ -90,6 +99,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       });
     }
   }
+
 
   void _changeSortOrder(String newOrder) {
     setState(() {
@@ -452,6 +462,13 @@ class _ResourceScreenState extends State<ResourceScreen> {
                           title: Text('Generate Test', style: TextStyle(fontSize: 14)),
                         ),
                       ),
+                      const PopupMenuItem( // Always available option
+                        value: 'discussions',
+                        child: ListTile(
+                          leading: Icon(Icons.forum, size: 20),
+                          title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
                       if (isOwner) ...[
                         PopupMenuItem(
                           value: 'edit',
@@ -481,6 +498,16 @@ class _ResourceScreenState extends State<ResourceScreen> {
                         _editResource(context, resource);
                       } else if (value == 'delete') {
                         _confirmDeleteResource(context, resourceId, resourceName);
+                      }  else if (value == 'discussions') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DiscussionScreen(
+                              itemId: resourceId,
+                              itemType: 'resource',
+                            ),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -573,26 +600,26 @@ class _ResourceScreenState extends State<ResourceScreen> {
           ),
           if (!widget.selectMode) ...[
             Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: currentPage > 1
-                        ? () => _goToPage(currentPage - 1)
-                        : null,
-                  ),
-                  Text('Page $currentPage of ${(totalResources / itemsPerPage).ceil()}'),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: currentPage < (totalResources / itemsPerPage).ceil()
-                        ? () => _goToPage(currentPage + 1)
-                        : null,
-                  ),
-                ],
-              ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: currentPage > 1
+                      ? () => _goToPage(currentPage - 1)
+                      : null,
+                ),
+                Text('Page $currentPage of ${max(1, (totalResources / itemsPerPage).ceil())}'),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: currentPage < (totalResources / itemsPerPage).ceil() && resources.length >= itemsPerPage
+                      ? () => _goToPage(currentPage + 1)
+                      : null,
+                ),
+              ],
             ),
+          ),
           ],
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
@@ -159,6 +160,13 @@ class _SearchScreenState extends State<SearchScreen> {
                 value: 'download',
                 child: Text('Download'),
               ),
+            const PopupMenuItem(
+              value: 'discussions',
+              child: ListTile(
+                leading: Icon(Icons.forum, size: 20),
+                title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+              ),
+            ),
             if (isOwner) ...[
               const PopupMenuItem(
                 value: 'edit',
@@ -198,6 +206,16 @@ class _SearchScreenState extends State<SearchScreen> {
               }
             } else if (value == 'delete') {
               _confirmDeleteItem(context, itemId, item['name'], isTest);
+            }  else if (value == 'discussions') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DiscussionScreen(
+                    itemId: itemId,
+                    itemType: 'test',
+                  ),
+                ),
+              );
             }
           },
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/create_test_ui.dart';
@@ -254,16 +255,23 @@ class _TestScreenState extends State<TestScreen> {
                   ),
                 ],
               ),
-              // Dropdown menu remains in top-right corner
-              if (isOwner)
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, 
-                      color: Colors.grey[600], 
-                      size: 20),
-                    itemBuilder: (context) => [
+              // Dropdown menu
+              Positioned(
+                top: 0,
+                right: 0,
+                child: PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, 
+                    color: Colors.grey[600], 
+                    size: 20),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem( // Always available option
+                      value: 'discussions',
+                      child: ListTile(
+                        leading: Icon(Icons.forum, size: 20),
+                        title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    if (isOwner) // Owner-specific options
                       const PopupMenuItem(
                         value: 'edit',
                         child: ListTile(
@@ -271,6 +279,7 @@ class _TestScreenState extends State<TestScreen> {
                           title: Text('Edit Test', style: TextStyle(fontSize: 14)),
                         ),
                       ),
+                    if (isOwner) // Owner-specific options
                       const PopupMenuItem(
                         value: 'delete',
                         child: ListTile(
@@ -278,21 +287,31 @@ class _TestScreenState extends State<TestScreen> {
                           title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
                         ),
                       ),
-                    ],
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditTestScreen(test: test),
+                  ],
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditTestScreen(test: test),
+                        ),
+                      ).then((_) => _fetchTests());
+                    } else if (value == 'delete') {
+                      _confirmDeleteTest(context, testId, testName);
+                    } else if (value == 'discussions') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DiscussionScreen(
+                            itemId: testId,
+                            itemType: 'test',
                           ),
-                        ).then((_) => _fetchTests());
-                      } else if (value == 'delete') {
-                        _confirmDeleteTest(context, testId, testName);
-                      }
-                    },
-                  ),
+                        ),
+                      );
+                    }
+                  },
                 ),
+              ),
             ],
           ),
         ),

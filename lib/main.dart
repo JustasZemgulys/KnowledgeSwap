@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:knowledgeswap/AppRouter.dart';
+import 'package:knowledgeswap/approuter.dart';
 import 'package:knowledgeswap/web_storage.dart';
 import 'package:knowledgeswap/welcome.dart';
 import 'package:provider/provider.dart';
