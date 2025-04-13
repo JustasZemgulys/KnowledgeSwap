@@ -14,12 +14,12 @@ class EditTestScreen extends StatefulWidget {
 }
 
 class _EditTestScreenState extends State<EditTestScreen> {
-  late UserInfo user_info;
+  late UserInfo userinfo;
 
   @override
   void initState() {
     super.initState();
-    user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+    userinfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
   }
 
   @override

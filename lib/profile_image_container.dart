@@ -19,7 +19,7 @@ class ProfileImageContainer extends StatelessWidget {
       height: height, // Ensure this height doesn't exceed the available space
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey.withOpacity(0.50),
+        color: Colors.grey,
       ),
       child: imagePath.isNotEmpty
           ? ClipOval(

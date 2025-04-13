@@ -21,15 +21,15 @@ Future<String?> sendMail(String recipientEmail, BuildContext context) async {
       if (responseData['success']) {
         return responseData['verificationCode'];
       } else {
-        print('Failed to send email: ${responseData['message']}');
+        //print('Failed to send email: ${responseData['message']}');
         return null;
       }
     } else {
-      print('Failed to send email: ${response.statusCode}');
+      //print('Failed to send email: ${response.statusCode}');
       return null;
     }
   } catch (e) {
-    print('Error sending email: $e');
+    //print('Error sending email: $e');
     return null;
   }
 }
@@ -64,6 +64,7 @@ class _ForgotPassScreenState extends State<ForgotPassScreen> {
             ElevatedButton(
               onPressed: () async {
                 //generatedCode = generateRandomCode();
+                // ignore: non_constant_identifier_names
                 String? EmailVerification =
                     await sendMail(emailController.text, context);
 

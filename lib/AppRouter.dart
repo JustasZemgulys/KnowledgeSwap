@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/create_group_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
+import 'package:knowledgeswap/group_ui.dart';
 import 'package:knowledgeswap/resource_ui.dart';
 import 'package:knowledgeswap/search_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
@@ -52,6 +54,12 @@ class AppRouter {
       case '/create-resource':
         _logRoute('Navigating to CreateResourceScreen');
         return MaterialPageRoute(builder: (_) => const CreateResourceScreen());
+      case '/groups':
+        _logRoute('Navigating to GroupScreen');
+        return MaterialPageRoute(builder: (_) => const GroupScreen());
+      case '/create-group':
+        _logRoute('Navigating to CreateGroupScreen');
+        return MaterialPageRoute(builder: (_) => const CreateGroupScreen());
       default:
         _logError('No route defined for ${settings.name}');
         return MaterialPageRoute(

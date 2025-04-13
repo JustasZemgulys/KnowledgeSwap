@@ -13,7 +13,16 @@ import 'dart:convert';
 import 'get_ip.dart';
 
 class TestScreen extends StatefulWidget {
-  const TestScreen({super.key});
+  final int initialPage;
+  final String initialSort;
+  final bool selectMode;
+
+  const TestScreen({
+    super.key,
+    this.initialPage = 1,
+    this.initialSort = 'desc',
+    this.selectMode = false,
+  });
 
   @override
   State<TestScreen> createState() => _TestScreenState();
@@ -21,12 +30,21 @@ class TestScreen extends StatefulWidget {
 
 class _TestScreenState extends State<TestScreen> {
   late UserInfo user_info;
+  late int currentPage;
+  late String sortOrder;
   List<dynamic> tests = [];
+  List<dynamic> filteredTests = [];
+  int itemsPerPage = 10;
+  int totalTests = 0;
   bool isLoading = true;
+  bool isSearching = false;
   String? serverIP;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
+    currentPage = widget.initialPage;
+    sortOrder = widget.initialSort;
     super.initState();
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     _initializeServerIP();
@@ -37,7 +55,6 @@ class _TestScreenState extends State<TestScreen> {
       serverIP = await getUserIP();
       _fetchTests();
     } catch (e) {
-      print('Error initializing server IP: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error connecting to server: $e')),
       );
@@ -49,28 +66,31 @@ class _TestScreenState extends State<TestScreen> {
 
     setState(() {
       isLoading = true;
-      tests = [];
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_tests.php?user_id=${user_info.id}');
+      final url = Uri.parse('http://$serverIP/get_tests.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
       final response = await http.get(url);
 
-      final data = jsonDecode(response.body);
-      
       if (response.statusCode == 200) {
-        if (data['success'] == true) {
-          setState(() {
-            tests = List<dynamic>.from(data['tests'] ?? []);
-          });
-        } else {
-          throw Exception(data['message'] ?? 'Failed to fetch tests');
-        }
+        final data = jsonDecode(response.body);
+        setState(() {
+          totalTests = int.tryParse(data['total'].toString()) ?? 0;
+          
+          if (data['tests'].isEmpty && currentPage > 1) {
+            currentPage--;
+            _fetchTests();
+            return;
+          }
+
+          tests = List<dynamic>.from(data['tests']);
+          filteredTests = List<dynamic>.from(tests);
+          isLoading = false;
+        });
       } else {
-        throw Exception('Server error: ${response.statusCode}');
+        throw Exception('Server returned status code ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching tests: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -81,13 +101,38 @@ class _TestScreenState extends State<TestScreen> {
           ),
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      setState(() {
+        isLoading = false;
+      });
     }
+  }
+
+  void _searchTests(String query) {
+    setState(() {
+      isSearching = query.isNotEmpty;
+      if (isSearching) {
+        filteredTests = tests.where((test) => 
+          test['name'].toString().toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      } else {
+        filteredTests = List<dynamic>.from(tests);
+      }
+    });
+  }
+
+  void _changeSortOrder(String newOrder) {
+    setState(() {
+      sortOrder = newOrder;
+      currentPage = 1;
+    });
+    _fetchTests();
+  }
+
+  void _goToPage(int page) {
+    setState(() {
+      currentPage = page;
+    });
+    _fetchTests();
   }
 
   Future<void> _deleteTest(int testId) async {
@@ -97,7 +142,7 @@ class _TestScreenState extends State<TestScreen> {
         url,
         body: {
           'test_id': testId.toString(),
-          'user_id': user_info.id.toString(), // Send user_id for verification
+          'user_id': user_info.id.toString(),
         },
       );
 
@@ -107,7 +152,7 @@ class _TestScreenState extends State<TestScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Test deleted successfully')),
         );
-        _fetchTests(); // Refresh the list
+        _fetchTests();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Failed to delete test')),
@@ -144,228 +189,220 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
 
-Widget _buildTestCard(Map<String, dynamic> test) {
-  final isOwner = test['fk_user'] == user_info.id;
-  final testId = test['id'];
-  final testName = test['name'] ?? 'Untitled Test';
-  final hasResource = test['has_resource'] ?? false;
-  final isPrivate = !(test['visibility'] ?? true);
-  final isAIMade = test['ai_made'] ?? false;
-  final score = test['score'] ?? 0; // Make sure your test model includes score
-  final userVote = test['user_vote']; // This should come from your API
+  Widget _buildTestCard(Map<String, dynamic> test) {
+    final isOwner = test['fk_user'] == user_info.id;
+    final testId = test['id'];
+    final testName = test['name'] ?? 'Untitled Test';
+    final hasResource = test['has_resource'] ?? false;
+    final isPrivate = !(test['visibility'] ?? true);
+    final isAIMade = test['ai_made'] ?? false;
+    final score = test['score'] ?? 0;
+    final userVote = test['user_vote'];
 
-  return Card(
-    elevation: 2,
-    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-    child: InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TakeTestScreen(testId: test['id']),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Stack(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Add voting widget here
-                Consumer<UserInfoProvider>(
-                  builder: (context, userProvider, child) {
-                    return VotingWidget(
-                      score: score,
-                      userVote: userVote,
-                      onUpvote: () {
-                        VotingController(
-                          context: context,
-                          itemType: 'test',
-                          itemId: testId,
-                          currentScore: score,
-                          onScoreUpdated: (newScore) {
-                            setState(() {
-                              test['score'] = newScore;
-                              test['user_vote'] = 1;
-                            });
-                          },
-                        ).upvote();
-                      },
-                      onDownvote: () {
-                        VotingController(
-                          context: context,
-                          itemType: 'test',
-                          itemId: testId,
-                          currentScore: score,
-                          onScoreUpdated: (newScore) {
-                            setState(() {
-                              test['score'] = newScore;
-                              test['user_vote'] = -1;
-                            });
-                          },
-                        ).downvote();
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title row with icons moved to the left
-                      Row(
-                        children: [
-                          // Status indicators container moved before the title
-                          if (hasResource || (isPrivate && isOwner) || isAIMade)
-                            Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (hasResource)
-                                    const Padding(
-                                      padding: EdgeInsets.only(right: 4),
-                                      child: Icon(Icons.attachment, 
-                                        color: Colors.blue, 
-                                        size: 20),
-                                    ),
-                                  if (isPrivate && isOwner)
-                                    Container(
-                                      child: const Text(
-                                        'Private',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey,
-                                        ),
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TakeTestScreen(testId: test['id']),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  VotingWidget(
+                    score: score,
+                    userVote: userVote,
+                    onUpvote: () {
+                      VotingController(
+                        context: context,
+                        itemType: 'test',
+                        itemId: testId,
+                        currentScore: score,
+                        onScoreUpdated: (newScore) {
+                          setState(() {
+                            test['score'] = newScore;
+                            test['user_vote'] = 1;
+                          });
+                        },
+                      ).upvote();
+                    },
+                    onDownvote: () {
+                      VotingController(
+                        context: context,
+                        itemType: 'test',
+                        itemId: testId,
+                        currentScore: score,
+                        onScoreUpdated: (newScore) {
+                          setState(() {
+                            test['score'] = newScore;
+                            test['user_vote'] = -1;
+                          });
+                        },
+                      ).downvote();
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (hasResource || (isPrivate && isOwner) || isAIMade)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (hasResource)
+                                      const Padding(
+                                        padding: EdgeInsets.only(right: 4),
+                                        child: Icon(Icons.attachment, 
+                                          color: Colors.blue, 
+                                          size: 20),
                                       ),
-                                    ),
-                                  if (isAIMade)
-                                    Tooltip(
-                                      message: 'AI Generated Test',
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(color: Colors.blue, width: 1),
-                                        ),
+                                    if (isPrivate && isOwner)
+                                      Container(
                                         child: const Text(
-                                          'AI',
+                                          'Private',
                                           style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blue,
+                                            fontSize: 13,
+                                            color: Colors.grey,
                                           ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                    if (isAIMade)
+                                      Tooltip(
+                                        message: 'AI Generated Test',
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.blue, width: 1),
+                                          ),
+                                          child: const Text(
+                                            'AI',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                testName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
                               ),
                             ),
-                          Expanded(
-                            child: Text(
-                              testName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          test['description'] ?? 'No description',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Questions: ${test['question_count']}',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            Text(
+                              'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        test['description'] ?? 'No description',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Questions: ${test['question_count']}',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                          Text(
-                            'Created: ${test['creation_date']?.split(' ')[0] ?? 'Unknown'}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Dropdown menu
-            Positioned(
-              top: 0,
-              right: 0,
-              child: PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, 
-                  color: Colors.grey[600], 
-                  size: 20),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'discussions',
-                    child: ListTile(
-                      leading: Icon(Icons.forum, size: 20),
-                      title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  if (isOwner)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: ListTile(
-                        leading: Icon(Icons.edit, size: 20),
-                        title: Text('Edit Test', style: TextStyle(fontSize: 14)),
-                      ),
-                    ),
-                  if (isOwner)
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: ListTile(
-                        leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                        title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
-                      ),
-                    ),
                 ],
-                onSelected: (value) async {
-                  if (value == 'edit') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditTestScreen(test: test),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, 
+                    color: Colors.grey[600], 
+                    size: 20),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'discussions',
+                      child: ListTile(
+                        leading: Icon(Icons.forum, size: 20),
+                        title: Text('View Discussions', style: TextStyle(fontSize: 14)),
                       ),
-                    ).then((_) => _fetchTests());
-                  } else if (value == 'delete') {
-                    _confirmDeleteTest(context, testId, testName);
-                  } else if (value == 'discussions') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DiscussionScreen(
-                          itemId: testId,
-                          itemType: 'test',
+                    ),
+                    if (isOwner)
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: ListTile(
+                          leading: Icon(Icons.edit, size: 20),
+                          title: Text('Edit Test', style: TextStyle(fontSize: 14)),
                         ),
                       ),
-                    );
-                  }
-                },
+                    if (isOwner)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                          title: Text('Delete Test', style: TextStyle(fontSize: 14, color: Colors.red)),
+                        ),
+                      ),
+                  ],
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditTestScreen(test: test),
+                        ),
+                      ).then((_) => _fetchTests());
+                    } else if (value == 'delete') {
+                      _confirmDeleteTest(context, testId, testName);
+                    } else if (value == 'discussions') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DiscussionScreen(
+                            itemId: testId,
+                            itemType: 'test',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -375,7 +412,62 @@ Widget _buildTestCard(Map<String, dynamic> test) {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search tests...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Theme.of(context).primaryColor),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_searchController.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        _fetchTests();
+                        setState(() {
+                          isSearching = false;
+                        });
+                      },
+                    ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.sort),
+                    onSelected: (value) => _changeSortOrder(value),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'desc',
+                        child: Text('Newest first'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'asc',
+                        child: Text('Oldest first'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            onChanged: _searchTests,
+          ),
+        ),
         actions: [
           TextButton.icon(
             onPressed: () {
@@ -403,17 +495,45 @@ Widget _buildTestCard(Map<String, dynamic> test) {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : tests.isEmpty
+          : filteredTests.isEmpty
               ? const Center(child: Text('No tests found'))
-              : RefreshIndicator(
-                  onRefresh: _fetchTests,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: tests.length,
-                    itemBuilder: (context, index) {
-                      return _buildTestCard(tests[index]);
-                    },
-                  ),
+              : Column(
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _fetchTests,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: filteredTests.length,
+                          itemBuilder: (context, index) {
+                            return _buildTestCard(filteredTests[index]);
+                          },
+                        ),
+                      ),
+                    ),
+                    if (!isSearching && totalTests > itemsPerPage)
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: currentPage > 1
+                                  ? () => _goToPage(currentPage - 1)
+                                  : null,
+                            ),
+                            Text('Page $currentPage of ${(totalTests / itemsPerPage).ceil()}'),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: currentPage < (totalTests / itemsPerPage).ceil() && tests.length >= itemsPerPage
+                                  ? () => _goToPage(currentPage + 1)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
     );
   }

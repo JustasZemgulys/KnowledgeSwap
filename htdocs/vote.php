@@ -24,7 +24,7 @@ try {
         throw new Exception("Invalid vote direction");
     }
 
-    if (!in_array($itemType, ['test', 'resource', 'comment'])) {
+    if (!in_array($itemType, ['test', 'resource', 'comment', 'group'])) {
         throw new Exception("Invalid item type");
     }
 
@@ -87,15 +87,15 @@ try {
         }
 
         // Update the item's score
-        $tableName = $itemType; // Assuming table names match item types
-        $updateScoreQuery = "UPDATE $tableName SET score = score + ? WHERE id = ?";
+        $tableName = $itemType;
+        $updateScoreQuery = "UPDATE `$tableName` SET score = score + ? WHERE id = ?";
         $stmt = $conn->prepare($updateScoreQuery);
         $stmt->bind_param("ii", $voteChange, $itemId);
         $stmt->execute();
         $stmt->close();
 
         // Update user points if this is a test or resource
-        if (in_array($itemType, ['test', 'resource'])) {
+        /*if (in_array($itemType, ['test', 'resource'])) {
             $pointsChange = $voteChange * ($itemType === 'test' ? 2 : 1); // Tests give more points
             
             // First, get the owner's user ID
@@ -119,10 +119,10 @@ try {
             $stmt->bind_param("iiiii", $pointsChange, $pointsChange, $pointsChange, $pointsChange, $ownerId);
             $stmt->execute();
             $stmt->close();
-        }
+        }*/
 
         // Get the new score
-        $getScoreQuery = "SELECT score FROM $tableName WHERE id = ?";
+        $getScoreQuery = "SELECT score FROM `$tableName` WHERE id = ?";
         $stmt = $conn->prepare($getScoreQuery);
         $stmt->bind_param("i", $itemId);
         $stmt->execute();

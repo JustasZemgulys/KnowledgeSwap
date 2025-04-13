@@ -117,7 +117,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   Future<void> _createResource() async {
     try {
       final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/upload_resource.php');
+      final url = Uri.parse('http://$userIP/create_resource.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['name'] = _resourceNameController.text

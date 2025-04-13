@@ -14,12 +14,12 @@ class EditResourceScreen extends StatefulWidget {
 }
 
 class _EditResourceScreenState extends State<EditResourceScreen> {
-  late UserInfo user_info;
+  late UserInfo userinfo;
 
   @override
   void initState() {
     super.initState();
-    user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+    userinfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
   }
 
   @override

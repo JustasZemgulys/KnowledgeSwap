@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/discussion_ui.dart';
+import 'package:knowledgeswap/edit_group_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
 import 'package:knowledgeswap/voting_system.dart';
+import 'package:knowledgeswap/group_detail_screen.dart';
 import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
@@ -44,44 +46,57 @@ class _SearchScreenState extends State<SearchScreen> {
     serverIP = await getUserIP();
   }
 
-  Future<void> _performSearch() async {
-    if (serverIP == null || searchQuery.isEmpty) return;
+Future<void> _performSearch() async {
+  if (serverIP == null || searchQuery.isEmpty) return;
 
-    setState(() {
-      isLoading = true;
-      currentPage = 1;
-    });
+  setState(() {
+    isLoading = true;
+    currentPage = 1;
+  });
 
-    try {
-      final url = Uri.parse(
-        'http://$serverIP/search.php?'
-        'query=${Uri.encodeComponent(searchQuery)}'
-        '&page=$currentPage'
-        '&per_page=$itemsPerPage'
-        '&sort=$sortOrder'
-        '&type=$resourceType'
-        '&user_id=${user_info.id}'
-      );
+  try {
+    final url = Uri.parse(
+      'http://$serverIP/search.php?'
+      'query=${Uri.encodeComponent(searchQuery)}'
+      '&page=$currentPage'
+      '&per_page=$itemsPerPage'
+      '&sort=$sortOrder'
+      '&type=$resourceType'
+      '&user_id=${user_info.id}'
+    );
 
-      final response = await http.get(url);
-      
-      if (response.statusCode == 200) {
+    final response = await http.get(url);
+    
+    if (response.statusCode == 200) {
+      try {
         final data = jsonDecode(response.body);
-        setState(() {
-          results = List<dynamic>.from(data['results']);
-          totalResults = int.tryParse(data['total'].toString()) ?? 0;
-          isLoading = false;
-        });
-      } else {
+        if (data is Map && data.containsKey('success')) {
+          setState(() {
+            results = List<dynamic>.from(data['results'] ?? []);
+            totalResults = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
+            isLoading = false;
+          });
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } catch (e) {
+        throw Exception('Failed to parse server response: $e');
+      }
+    } else {
+      try {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Server error');
+      } catch (_) {
         throw Exception('Server returned status code ${response.statusCode}');
       }
-    } catch (e) {
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search failed: $e')),
-      );
     }
+  } catch (e) {
+    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Search failed: ${e.toString()}')),
+    );
   }
+}
 
   Future<void> _downloadResource(Map<String, dynamic> resource) async {
     final resourcePath = resource['resource_link'] ?? '';
@@ -133,6 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSearchResultCard(Map<String, dynamic> item) {
     final isOwner = item['fk_user'] == user_info.id;
     final isTest = item['type'] == 'test';
+    final isGroup = item['type'] == 'group';
     final itemId = item['id'];
     final isPrivate = item['visibility'] == 0;
     final score = item['score'] ?? 0;
@@ -157,7 +173,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   onPressed: () {
                     VotingController(
                       context: context,
-                      itemType: isTest ? 'test' : 'resource',
+                      itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
                       itemId: itemId,
                       currentScore: score,
                       onScoreUpdated: (newScore) {
@@ -184,7 +200,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   onPressed: () {
                     VotingController(
                       context: context,
-                      itemType: isTest ? 'test' : 'resource',
+                      itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
                       itemId: itemId,
                       currentScore: score,
                       onScoreUpdated: (newScore) {
@@ -208,9 +224,10 @@ class _SearchScreenState extends State<SearchScreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${isTest ? 'Test' : 'Resource'} • Created: ${item['creation_date']}'),
+                  Text('${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')} • Created: ${item['creation_date']}'),
                   Text('By: ${item['creator_name'] ?? 'Unknown'}'),
                   if (isPrivate) Text('Private', style: TextStyle(color: Colors.grey)),
+                  if (isGroup) Text('${item['member_count'] ?? 0} members', style: TextStyle(color: Colors.grey)),
                 ],
               ),
               trailing: PopupMenuButton<String>(
@@ -221,7 +238,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       value: 'take_test',
                       child: Text('Take Test'),
                     ),
-                  if (!isTest)
+                  if (!isTest && !isGroup)
                     const PopupMenuItem(
                       value: 'download',
                       child: Text('Download'),
@@ -233,6 +250,14 @@ class _SearchScreenState extends State<SearchScreen> {
                       title: Text('View Discussions', style: TextStyle(fontSize: 14)),
                     ),
                   ),
+                  if (isGroup && item['is_member'] == true)
+                    const PopupMenuItem(
+                      value: 'group_discussions',
+                      child: ListTile(
+                        leading: Icon(Icons.forum, size: 20),
+                        title: Text('Group Chat', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
                   if (isOwner) ...[
                     const PopupMenuItem(
                       value: 'edit',
@@ -243,6 +268,16 @@ class _SearchScreenState extends State<SearchScreen> {
                       child: Text('Delete', style: TextStyle(color: Colors.red)),
                     ),
                   ],
+                  if (isGroup && !item['is_member'] && !isOwner)
+                    const PopupMenuItem(
+                      value: 'join_group',
+                      child: Text('Join Group'),
+                    ),
+                  if (isGroup && item['is_member'] && !isOwner)
+                    const PopupMenuItem(
+                      value: 'leave_group',
+                      child: Text('Leave Group', style: TextStyle(color: Colors.red)),
+                    ),
                 ],
                 onSelected: (value) async {
                   if (value == 'take_test') {
@@ -262,6 +297,13 @@ class _SearchScreenState extends State<SearchScreen> {
                           builder: (context) => EditTestScreen(test: item),
                         ),
                       ).then((_) => _performSearch());
+                    } else if (isGroup) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditGroupScreen(group: item),
+                        ),
+                      ).then((_) => _performSearch());
                     } else {
                       Navigator.push(
                         context,
@@ -271,17 +313,31 @@ class _SearchScreenState extends State<SearchScreen> {
                       ).then((_) => _performSearch());
                     }
                   } else if (value == 'delete') {
-                    _confirmDeleteItem(context, itemId, item['name'], isTest);
+                    _confirmDeleteItem(context, itemId, item['name'], isTest, isGroup);
                   } else if (value == 'discussions') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => DiscussionScreen(
                           itemId: itemId,
-                          itemType: isTest ? 'test' : 'resource',
+                          itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
                         ),
                       ),
                     );
+                  } else if (value == 'group_discussions') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DiscussionScreen(
+                          itemId: itemId * -1,
+                          itemType: 'group',
+                        ),
+                      ),
+                    );
+                  } else if (value == 'join_group') {
+                    await _joinGroup(itemId);
+                  } else if (value == 'leave_group') {
+                    await _leaveGroup(itemId);
                   }
                 },
               ),
@@ -291,6 +347,16 @@ class _SearchScreenState extends State<SearchScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => TakeTestScreen(testId: itemId),
+                    ),
+                  );
+                } else if (isGroup) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GroupDetailScreen(
+                        groupId: itemId,
+                        groupName: item['name'],
+                      ),
                     ),
                   );
                 } else {
@@ -304,11 +370,73 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Future<void> _confirmDeleteItem(BuildContext context, int itemId, String itemName, bool isTest) async {
+  Future<void> _joinGroup(int groupId) async {
+    try {
+      final url = Uri.parse('http://$serverIP/join_group.php');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'group_id': groupId,
+          'user_id': user_info.id,
+        }),
+      );
+
+      final responseData = json.decode(response.body);
+      
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully joined the group')),
+        );
+        _performSearch();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to join group')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error joining group: $e')),
+      );
+    }
+  }
+
+  Future<void> _leaveGroup(int groupId) async {
+    try {
+      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'group_id': groupId,
+          'user_id': user_info.id,
+        }),
+      );
+
+      final responseData = json.decode(response.body);
+      
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully left the group')),
+        );
+        _performSearch();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to leave group')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error leaving group: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteItem(BuildContext context, int itemId, String itemName, bool isTest, bool isGroup) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete ${isTest ? 'Test' : 'Resource'}'),
+        title: Text('Delete ${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')}'),
         content: Text('Are you sure you want to delete "$itemName"?'),
         actions: [
           TextButton(
@@ -324,18 +452,28 @@ class _SearchScreenState extends State<SearchScreen> {
     );
 
     if (confirmed == true) {
-      await _deleteItem(itemId, isTest);
+      await _deleteItem(itemId, isTest, isGroup);
     }
   }
 
-  Future<void> _deleteItem(int itemId, bool isTest) async {
+  Future<void> _deleteItem(int itemId, bool isTest, bool isGroup) async {
     try {
-      final endpoint = isTest ? 'delete_test.php' : 'delete_resource.php';
+      String endpoint;
+      String idField;
+      
+      if (isGroup) {
+        endpoint = 'delete_group.php';
+        idField = 'group_id';
+      } else {
+        endpoint = isTest ? 'delete_test.php' : 'delete_resource.php';
+        idField = isTest ? 'test_id' : 'resource_id';
+      }
+
       final url = Uri.parse('http://$serverIP/$endpoint');
       final response = await http.post(
         url,
         body: {
-          isTest ? 'test_id' : 'resource_id': itemId.toString(),
+          idField: itemId.toString(),
           'user_id': user_info.id.toString(),
         },
       );
@@ -344,17 +482,17 @@ class _SearchScreenState extends State<SearchScreen> {
       
       if (responseData['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${isTest ? 'Test' : 'Resource'} deleted successfully')),
+          SnackBar(content: Text('${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')} deleted successfully')),
         );
         _performSearch();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete ${isTest ? 'test' : 'resource'}')),
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete ${isGroup ? 'group' : (isTest ? 'test' : 'resource')}')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting ${isTest ? 'test' : 'resource'}: $e')),
+        SnackBar(content: Text('Error deleting ${isGroup ? 'group' : (isTest ? 'test' : 'resource')}: $e')),
       );
     }
   }
@@ -422,6 +560,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     DropdownMenuItem(value: 'all', child: Text('All')),
                     DropdownMenuItem(value: 'resource', child: Text('Resources')),
                     DropdownMenuItem(value: 'test', child: Text('Tests')),
+                    DropdownMenuItem(value: 'group', child: Text('Groups')),
                   ],
                   onChanged: (value) {
                     setState(() => resourceType = value!);

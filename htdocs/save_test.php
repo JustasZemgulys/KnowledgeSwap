@@ -32,7 +32,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Validate required fields
-if (empty($data['name']) || empty($data['description']) || empty($data['questions']) || empty($data['userId'])) {
+if (empty($data['name']) || empty($data['questions']) || empty($data['userId'])) {
     die(json_encode([
         'success' => false, 
         'message' => 'Missing required fields',

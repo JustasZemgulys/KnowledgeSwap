@@ -70,11 +70,13 @@ class VotingController {
         final newScore = responseData['new_score'] ?? currentScore;
         onScoreUpdated(newScore);
       } else {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Voting failed')),
         );
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error submitting vote: $e')),
       );

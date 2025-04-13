@@ -16,11 +16,11 @@ class ProfileDetailsScreen extends StatefulWidget {
 }
 
 class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
-  late UserInfo user_info;
+  late UserInfo userinfo;
   @override
   void initState() {
     super.initState();
-    user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+    userinfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
   }
 
   Future<void> updateProfilePicture(String newImageUrl, int userId) async {
@@ -38,7 +38,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     );
 
     if (response.statusCode == 200) {
-      user_info.imageURL = newImageUrl;
+      userinfo.imageURL = newImageUrl;
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update profile picture!')),
@@ -48,7 +48,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   void _showImageUpdateDialog() {
     String newImageUrl = '';
-    int userId = user_info.id;
+    int userId = userinfo.id;
 
     showDialog(
       context: context,
@@ -139,14 +139,14 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                             shape: BoxShape.circle,
                             image: DecorationImage(
                               fit: BoxFit.cover,
-                              image: user_info.imageURL != "default"
-                                  ? NetworkImage(user_info.imageURL)
+                              image: userinfo.imageURL != "default"
+                                  ? NetworkImage(userinfo.imageURL)
                                       as ImageProvider
                                   : const AssetImage('assets/usericon.jpg')
                                       as ImageProvider,
                               onError: (_, __) {
                                 setState(() {
-                                  user_info.imageURL =
+                                  userinfo.imageURL =
                                       "default"; // Fallback to default image
                                 });
                               },
@@ -160,7 +160,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                     ),
                     Center(
                       child: Text(
-                        user_info.name,
+                        userinfo.name,
                         style: const TextStyle(
                           fontFamily: "Karla",
                           fontSize: 20,

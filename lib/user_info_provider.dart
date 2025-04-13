@@ -37,7 +37,7 @@ class UserInfoProvider with ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Error during auto-login: $e');
+      //print('Error during auto-login: $e');
       await WebStorage.clearUser();
       return false;
     }

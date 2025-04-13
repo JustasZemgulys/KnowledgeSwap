@@ -1,8 +1,4 @@
 <?php
-// Turn off all error reporting to prevent HTML output
-error_reporting(0);
-ini_set('display_errors', 0);
-
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -17,6 +13,12 @@ try {
     }
     $userId = (int)$_GET['user_id'];
     
+    // Get pagination parameters
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
+    $sort = in_array(strtoupper($_GET['sort'] ?? ''), ['ASC', 'DESC']) ? $_GET['sort'] : 'DESC';
+    $offset = ($page - 1) * $perPage;
+    
     $servername = "localhost";
     $username = "root";
     $password = "";
@@ -27,33 +29,50 @@ try {
         throw new Exception("Database connection failed");
     }
 
+    // First get total count
+    $countQuery = "SELECT COUNT(*) as total FROM test WHERE (visibility = 1 OR fk_user = ?)";
+    $countStmt = $conn->prepare($countQuery);
+    if (!$countStmt) {
+        throw new Exception("Count query preparation failed");
+    }
+    
+    $countStmt->bind_param("i", $userId);
+    if (!$countStmt->execute()) {
+        throw new Exception("Count query execution failed");
+    }
+    
+    $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
+    $countStmt->close();
+
+    // Then get paginated results
     $testQuery = "
-		SELECT 
-			t.id,
-			t.name,
-			t.description,
-			t.creation_date,
-			t.visibility,
-			t.fk_resource,
-			t.fk_user,
-			t.ai_made,
-			t.score,
-			v.direction as user_vote,
-			COUNT(q.id) as question_count
-		FROM test t
-		LEFT JOIN question q ON q.fk_test = t.id
-		LEFT JOIN vote v ON v.fk_item = t.id AND v.fk_type = 'test' AND v.fk_user = ?
-		WHERE (t.visibility = 1 OR t.fk_user = ?)
-		GROUP BY t.id
-		ORDER BY t.creation_date DESC
-	";
+        SELECT 
+            t.id,
+            t.name,
+            t.description,
+            t.creation_date,
+            t.visibility,
+            t.fk_resource,
+            t.fk_user,
+            t.ai_made,
+            t.score,
+            v.direction as user_vote,
+            COUNT(q.id) as question_count
+        FROM test t
+        LEFT JOIN question q ON q.fk_test = t.id
+        LEFT JOIN vote v ON v.fk_item = t.id AND v.fk_type = 'test' AND v.fk_user = ?
+        WHERE (t.visibility = 1 OR t.fk_user = ?)
+        GROUP BY t.id
+        ORDER BY t.creation_date $sort
+        LIMIT ? OFFSET ?
+    ";
 
     $stmt = $conn->prepare($testQuery);
     if (!$stmt) {
         throw new Exception("Database query preparation failed");
     }
     
-    $stmt->bind_param("ii", $userId, $userId);
+    $stmt->bind_param("iiii", $userId, $userId, $perPage, $offset);
     if (!$stmt->execute()) {
         throw new Exception("Query execution failed");
     }
@@ -68,21 +87,22 @@ try {
             'description' => $row['description'],
             'creation_date' => $row['creation_date'],
             'has_resource' => !empty($row['fk_resource']),
-			'fk_resource' => $row['fk_resource'],
+            'fk_resource' => $row['fk_resource'],
             'question_count' => (int)$row['question_count'],
             'is_owner' => ($row['fk_user'] == $userId),
-			'ai_made' => (bool)$row['ai_made'],
-			'score' => $row['score'],
-			'fk_user' => $row['fk_user'],
+            'ai_made' => (bool)$row['ai_made'],
+            'score' => $row['score'],
+            'fk_user' => $row['fk_user'],
             'visibility' => (bool)$row['visibility'],
-			'score' => (int)$row['score'],
-			'user_vote' => $row['user_vote'] ? (int)$row['user_vote'] : null,
+            'score' => (int)$row['score'],
+            'user_vote' => $row['user_vote'] ? (int)$row['user_vote'] : null,
         ];
     }
 
     $response = [
         'success' => true,
-        'tests' => $tests
+        'tests' => $tests,
+        'total' => $total
     ];
 
     $stmt->close();
@@ -96,7 +116,6 @@ try {
     ];
 }
 
-// Ensure only JSON is output
 echo json_encode($response);
 exit;
 ?>

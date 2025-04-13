@@ -25,7 +25,6 @@ class ResourceScreen extends StatefulWidget {
     this.selectMode = false,
   });
 
-
   @override
   State<ResourceScreen> createState() => _ResourceScreenState();
 }
@@ -35,10 +34,13 @@ class _ResourceScreenState extends State<ResourceScreen> {
   late int currentPage;
   late String sortOrder;
   List<dynamic> resources = [];
+  List<dynamic> filteredResources = [];
   int itemsPerPage = 6;
   int totalResources = 0;
   bool isLoading = true;
+  bool isSearching = false;
   String? serverIP;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -54,7 +56,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
       serverIP = await getUserIP();
       _fetchResources();
     } catch (e) {
-      //print('Error initializing server IP: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error connecting to server: $e')),
       );
@@ -75,17 +76,17 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        totalResources = int.tryParse(data['total'].toString()) ?? 0;
-        
-        // If we got an empty page but it's not the first page, try previous pages
-        if (data['resources'].isEmpty && currentPage > 1) {
-          currentPage--;
-          _fetchResources();
-          return;
-        }
-
         setState(() {
+          totalResources = int.tryParse(data['total'].toString()) ?? 0;
+          
+          if (data['resources'].isEmpty && currentPage > 1) {
+            currentPage--;
+            _fetchResources();
+            return;
+          }
+
           resources = List<dynamic>.from(data['resources']);
+          filteredResources = List<dynamic>.from(resources);
           isLoading = false;
         });
       } else {
@@ -101,6 +102,18 @@ class _ResourceScreenState extends State<ResourceScreen> {
     }
   }
 
+  void _searchResources(String query) {
+    setState(() {
+      isSearching = query.isNotEmpty;
+      if (isSearching) {
+        filteredResources = resources.where((resource) => 
+          resource['name'].toString().toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      } else {
+        filteredResources = List<dynamic>.from(resources);
+      }
+    });
+  }
 
   void _changeSortOrder(String newOrder) {
     setState(() {
@@ -140,7 +153,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
       final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
 
       // Create download link
-      // ignore: unused_local_variable
       final anchor = html.AnchorElement(href: fullUrl)
         ..setAttribute('download', resourceName)
         ..setAttribute('type', mimeType)
@@ -150,7 +162,6 @@ class _ResourceScreenState extends State<ResourceScreen> {
         SnackBar(content: Text('Downloading $resourceName...')),
       );
     } catch (e) {
-      //print('Error downloading resource: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to download resource: $e')),
       );
@@ -471,74 +482,74 @@ class _ResourceScreenState extends State<ResourceScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.arrow_upward,
-                              color: localUserVote == 1 ? Colors.orange : Colors.grey,
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              final newVote = localUserVote == 1 ? null : 1;
-                              final scoreChange = newVote == null ? -1 : (localUserVote == -1 ? 2 : 1);
-                              
-                              // Immediate UI update
-                              setState(() {
-                                localUserVote = newVote;
-                                localScore = localScore + scoreChange;
-                              });
-
-                              // Send to server
-                              VotingController(
-                                context: context,
-                                itemType: 'resource',
-                                itemId: resourceId,
-                                currentScore: localScore,
-                                onScoreUpdated: (newScore) {
-                                  // This is just a fallback in case server response differs
-                                  if (mounted) {
-                                    setState(() {
-                                      resource['score'] = newScore;
-                                      resource['user_vote'] = newVote;
-                                    });
-                                  }
-                                },
-                              ).upvote();
-                            },
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_upward,
+                            color: localUserVote == 1 ? Colors.orange : Colors.grey,
+                            size: 20,
                           ),
-                          Text(localScore.toString()),
-                          IconButton(
-                            icon: Icon(
-                              Icons.arrow_downward,
-                              color: localUserVote == -1 ? Colors.blue : Colors.grey,
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              final newVote = localUserVote == -1 ? null : -1;
-                              final scoreChange = newVote == null ? 1 : (localUserVote == 1 ? -2 : -1);
-                              
-                              // Immediate UI update
-                              setState(() {
-                                localUserVote = newVote;
-                                localScore = localScore + scoreChange;
-                              });
+                          onPressed: () {
+                            final newVote = localUserVote == 1 ? null : 1;
+                            final scoreChange = newVote == null ? -1 : (localUserVote == -1 ? 2 : 1);
+                            
+                            // Immediate UI update
+                            setState(() {
+                              localUserVote = newVote;
+                              localScore = localScore + scoreChange;
+                            });
 
-                              // Send to server
-                              VotingController(
-                                context: context,
-                                itemType: 'resource',
-                                itemId: resourceId,
-                                currentScore: localScore,
-                                onScoreUpdated: (newScore) {
-                                  if (mounted) {
-                                    setState(() {
-                                      resource['score'] = newScore;
-                                      resource['user_vote'] = newVote;
-                                    });
-                                  }
-                                },
-                              ).downvote();
-                            },
+                            // Send to server
+                            VotingController(
+                              context: context,
+                              itemType: 'resource',
+                              itemId: resourceId,
+                              currentScore: localScore,
+                              onScoreUpdated: (newScore) {
+                                // This is just a fallback in case server response differs
+                                if (mounted) {
+                                  setState(() {
+                                    resource['score'] = newScore;
+                                    resource['user_vote'] = newVote;
+                                  });
+                                }
+                              },
+                            ).upvote();
+                          },
+                        ),
+                        Text(localScore.toString()),
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_downward,
+                            color: localUserVote == -1 ? Colors.blue : Colors.grey,
+                            size: 20,
                           ),
+                          onPressed: () {
+                            final newVote = localUserVote == -1 ? null : -1;
+                            final scoreChange = newVote == null ? 1 : (localUserVote == 1 ? -2 : -1);
+                            
+                            // Immediate UI update
+                            setState(() {
+                              localUserVote = newVote;
+                              localScore = localScore + scoreChange;
+                            });
+
+                            // Send to server
+                            VotingController(
+                              context: context,
+                              itemType: 'resource',
+                              itemId: resourceId,
+                              currentScore: localScore,
+                              onScoreUpdated: (newScore) {
+                                if (mounted) {
+                                  setState(() {
+                                    resource['score'] = newScore;
+                                    resource['user_vote'] = newVote;
+                                  });
+                                }
+                              },
+                            ).downvote();
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -634,50 +645,86 @@ class _ResourceScreenState extends State<ResourceScreen> {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
               ),
-              iconTheme: const IconThemeData(color: Colors.black),
-              actions: [
-                TextButton.icon(
-                  onPressed: () => Navigator.pushNamed(
-                    context,
-                    '/create-resource',
-                    arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
+              title: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search resources...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchResources('');
+                            },
+                          ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.sort),
+                          onSelected: (value) => _changeSortOrder(value),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'desc',
+                              child: Text('Newest first'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'asc',
+                              child: Text('Oldest first'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  icon: const Icon(Icons.add),
-                  label: const Text("Create Resource"),
+                  onChanged: _searchResources,
                 ),
-                const SizedBox(width: 1),
-                IconButton(
-                  icon: Image.asset("assets/usericon.jpg"),
-                  onPressed: () => Navigator.pushNamed(context, '/profile'),
-                ),
+              ),
+              actions: [
+                if (!widget.selectMode) ...[
+                  TextButton.icon(
+                    onPressed: () => Navigator.pushNamed(
+                      context,
+                      '/create-resource',
+                      arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text("Create Resource"),
+                  ),
+                  const SizedBox(width: 1),
+                  IconButton(
+                    icon: Image.asset("assets/usericon.jpg"),
+                    onPressed: () => Navigator.pushNamed(context, '/profile'),
+                  ),
+                ],
               ],
               elevation: 0,
               backgroundColor: Colors.transparent,
             ),
       body: Column(
         children: [
-          if (!widget.selectMode) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                children: [
-                  const Text('Sort by date: '),
-                  DropdownButton<String>(
-                    value: sortOrder,
-                    items: const [
-                      DropdownMenuItem(value: 'desc', child: Text('Newest first')),
-                      DropdownMenuItem(value: 'asc', child: Text('Oldest first')),
-                    ],
-                    onChanged: (value) => _changeSortOrder(value!),
-                  ),
-                ],
-              ),
-            ),
-          ],
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : resources.isEmpty
+                : filteredResources.isEmpty
                     ? const Center(child: Text('No resources found'))
                     : GridView.builder(
                         padding: const EdgeInsets.all(16),
@@ -687,34 +734,34 @@ class _ResourceScreenState extends State<ResourceScreen> {
                           mainAxisSpacing: 16,
                           childAspectRatio: widget.selectMode ? 1.5 : 0.9,
                         ),
-                        itemCount: resources.length,
+                        itemCount: filteredResources.length,
                         itemBuilder: (context, index) {
-                          return _buildResourceCard(resources[index]);
+                          return _buildResourceCard(filteredResources[index]);
                         },
                       ),
           ),
-          if (!widget.selectMode) ...[
+          if (!widget.selectMode && !isSearching && totalResources > itemsPerPage) ...[
             Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: currentPage > 1
-                      ? () => _goToPage(currentPage - 1)
-                      : null,
-                ),
-                Text('Page $currentPage of ${max(1, (totalResources / itemsPerPage).ceil())}'),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: currentPage < (totalResources / itemsPerPage).ceil() && resources.length >= itemsPerPage
-                      ? () => _goToPage(currentPage + 1)
-                      : null,
-                ),
-              ],
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: currentPage > 1
+                        ? () => _goToPage(currentPage - 1)
+                        : null,
+                  ),
+                  Text('Page $currentPage of ${max(1, (totalResources / itemsPerPage).ceil())}'),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: currentPage < (totalResources / itemsPerPage).ceil() && resources.length >= itemsPerPage
+                        ? () => _goToPage(currentPage + 1)
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
           ],
         ],
       ),

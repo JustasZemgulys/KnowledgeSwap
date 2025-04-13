@@ -7,7 +7,7 @@ class UserInfo {
   UserInfo(this.id, this.name, this.email, this.imageURL);
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
-    int _parseIntFromJson(dynamic value) {
+    int parseIntFromJson(dynamic value) {
       if (value is int) {
         return value;
       } else if (value is String) {
@@ -18,7 +18,7 @@ class UserInfo {
     }
 
     return UserInfo(
-      _parseIntFromJson(json['id']),
+      parseIntFromJson(json['id']),
       json['name'] as String,
       json['email'] as String,
       json['imageURL'] as String,
@@ -26,6 +26,6 @@ class UserInfo {
   }
 
   void printUser() {
-    print(id);
+    //print(id);
   }
 }

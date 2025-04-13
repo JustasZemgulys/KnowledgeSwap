@@ -201,7 +201,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 10),
             Row(
               children: [

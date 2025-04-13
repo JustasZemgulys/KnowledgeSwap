@@ -14,7 +14,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   late UserInfo user_info;
   int _currentIndex = 0;
-  final List<String> _routeNames = ['/test', '/resources', '/search']; // Fixed
+  final List<String> _routeNames = ['/test', '/resources', '/search', '/groups'];
 
   @override
   void initState() {
@@ -36,6 +36,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         onTap: (newIndex) async {
           if (_routeNames[newIndex] == '/resources') {
@@ -67,6 +68,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.search), 
             label: "Search"
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people), 
+            label: "Groups"
           ),
         ],
       ),
