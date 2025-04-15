@@ -49,6 +49,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
     super.initState();
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     _initializeServerIP();
+    
   }
 
   Future<void> _initializeServerIP() async {
@@ -153,6 +154,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
 
       // Create download link
+      // ignore: unused_local_variable
       final anchor = html.AnchorElement(href: fullUrl)
         ..setAttribute('download', resourceName)
         ..setAttribute('type', mimeType)
@@ -626,69 +628,69 @@ class _ResourceScreenState extends State<ResourceScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WebStorage.saveLastRoute(ModalRoute.of(context)?.settings.name ?? '');
-    });
-  
-    return Scaffold(
-      appBar: widget.selectMode
-          ? AppBar(
-              title: const Text('Select a Resource'),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+Widget build(BuildContext context) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    WebStorage.saveLastRoute(ModalRoute.of(context)?.settings.name ?? '');
+  });
+
+  return Scaffold(
+    appBar: widget.selectMode
+        ? AppBar(
+            title: const Text('Select a Resource'),
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.deepPurple),
+              onPressed: () => Navigator.pop(context),
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
+          )
+        : AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
+              onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
+            ),
+            title: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
               ),
-            )
-          : AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
-              ),
-              title: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              child: Center(
                 child: TextField(
                   controller: _searchController,
+                  textAlignVertical: TextAlignVertical.center,
+                  style: TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     hintText: 'Search resources...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Theme.of(context).primaryColor),
-                    ),
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    isDense: true,
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (_searchController.text.isNotEmpty)
                           IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear, color: Colors.grey),
                             onPressed: () {
                               _searchController.clear();
                               _searchResources('');
                             },
                           ),
                         PopupMenuButton<String>(
-                          icon: const Icon(Icons.sort),
+                          icon: const Icon(Icons.sort, color: Colors.deepPurple),
+                          color: Colors.white,
                           onSelected: (value) => _changeSortOrder(value),
                           itemBuilder: (context) => [
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'desc',
-                              child: Text('Newest first'),
+                              child: Text('Newest first',
+                                style: TextStyle(color: Colors.black)),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'asc',
-                              child: Text('Oldest first'),
+                              child: Text('Oldest first',
+                                style: TextStyle(color: Colors.black)),
                             ),
                           ],
                         ),
@@ -698,34 +700,49 @@ class _ResourceScreenState extends State<ResourceScreen> {
                   onChanged: _searchResources,
                 ),
               ),
-              actions: [
-                if (!widget.selectMode) ...[
-                  TextButton.icon(
-                    onPressed: () => Navigator.pushNamed(
-                      context,
-                      '/create-resource',
-                      arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
-                    ),
-                    icon: const Icon(Icons.add),
-                    label: const Text("Create Resource"),
-                  ),
-                  const SizedBox(width: 1),
-                  IconButton(
-                    icon: Image.asset("assets/usericon.jpg"),
-                    onPressed: () => Navigator.pushNamed(context, '/profile'),
-                  ),
-                ],
-              ],
-              elevation: 0,
-              backgroundColor: Colors.transparent,
             ),
-      body: Column(
+            actions: [
+              if (!widget.selectMode) ...[
+                TextButton.icon(
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    '/create-resource',
+                    arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
+                  ),
+                  icon: const Icon(Icons.add, color: Colors.deepPurple),
+                  label: const Text("Create Resource",
+                    style: TextStyle(color: Colors.deepPurple)),
+                ),
+                const SizedBox(width: 1),
+                IconButton(
+                  icon: Image.asset("assets/usericon.jpg"),
+                  onPressed: () => Navigator.pushNamed(context, '/profile'),
+                ),
+              ],
+            ],
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+          ),
+    body: Padding(
+      padding: EdgeInsets.only(top: 0),
+      child: Column(
         children: [
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.deepPurple,
+                    ),
+                  )
                 : filteredResources.isEmpty
-                    ? const Center(child: Text('No resources found'))
+                    ? Center(
+                        child: Text(
+                          'No resources found',
+                          style: TextStyle(color: Colors.grey[800]),
+                        ),
+                      )
                     : GridView.builder(
                         padding: const EdgeInsets.all(16),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -747,14 +764,17 @@ class _ResourceScreenState extends State<ResourceScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left),
+                    icon: const Icon(Icons.chevron_left, color: Colors.deepPurple),
                     onPressed: currentPage > 1
                         ? () => _goToPage(currentPage - 1)
                         : null,
                   ),
-                  Text('Page $currentPage of ${max(1, (totalResources / itemsPerPage).ceil())}'),
+                  Text(
+                    'Page $currentPage of ${max(1, (totalResources / itemsPerPage).ceil())}',
+                    style: TextStyle(color: Colors.grey[800]),
+                  ),
                   IconButton(
-                    icon: const Icon(Icons.chevron_right),
+                    icon: const Icon(Icons.chevron_right, color: Colors.deepPurple),
                     onPressed: currentPage < (totalResources / itemsPerPage).ceil() && resources.length >= itemsPerPage
                         ? () => _goToPage(currentPage + 1)
                         : null,
@@ -765,6 +785,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
           ],
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

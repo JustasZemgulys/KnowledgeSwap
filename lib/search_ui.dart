@@ -46,57 +46,57 @@ class _SearchScreenState extends State<SearchScreen> {
     serverIP = await getUserIP();
   }
 
-Future<void> _performSearch() async {
-  if (serverIP == null || searchQuery.isEmpty) return;
+  Future<void> _performSearch() async {
+    if (serverIP == null || searchQuery.isEmpty) return;
 
-  setState(() {
-    isLoading = true;
-    currentPage = 1;
-  });
+    setState(() {
+      isLoading = true;
+      currentPage = 1;
+    });
 
-  try {
-    final url = Uri.parse(
-      'http://$serverIP/search.php?'
-      'query=${Uri.encodeComponent(searchQuery)}'
-      '&page=$currentPage'
-      '&per_page=$itemsPerPage'
-      '&sort=$sortOrder'
-      '&type=$resourceType'
-      '&user_id=${user_info.id}'
-    );
+    try {
+      final url = Uri.parse(
+        'http://$serverIP/search.php?'
+        'query=${Uri.encodeComponent(searchQuery)}'
+        '&page=$currentPage'
+        '&per_page=$itemsPerPage'
+        '&sort=$sortOrder'
+        '&type=$resourceType'
+        '&user_id=${user_info.id}'
+      );
 
-    final response = await http.get(url);
-    
-    if (response.statusCode == 200) {
-      try {
-        final data = jsonDecode(response.body);
-        if (data is Map && data.containsKey('success')) {
-          setState(() {
-            results = List<dynamic>.from(data['results'] ?? []);
-            totalResults = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
-            isLoading = false;
-          });
-        } else {
-          throw Exception('Invalid response format');
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map && data.containsKey('success')) {
+            setState(() {
+              results = List<dynamic>.from(data['results'] ?? []);
+              totalResults = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
+              isLoading = false;
+            });
+          } else {
+            throw Exception('Invalid response format');
+          }
+        } catch (e) {
+          throw Exception('Failed to parse server response: $e');
         }
-      } catch (e) {
-        throw Exception('Failed to parse server response: $e');
+      } else {
+        try {
+          final errorData = jsonDecode(response.body);
+          throw Exception(errorData['message'] ?? 'Server error');
+        } catch (_) {
+          throw Exception('Server returned status code ${response.statusCode}');
+        }
       }
-    } else {
-      try {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ?? 'Server error');
-      } catch (_) {
-        throw Exception('Server returned status code ${response.statusCode}');
-      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Search failed: ${e.toString()}')),
+      );
     }
-  } catch (e) {
-    setState(() => isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Search failed: ${e.toString()}')),
-    );
   }
-}
 
   Future<void> _downloadResource(Map<String, dynamic> resource) async {
     final resourcePath = resource['resource_link'] ?? '';
@@ -505,7 +505,11 @@ Future<void> _performSearch() async {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
         ),
-        title: const Text('Search'),
+        title: Text(
+          "Search",
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        
         actions: [
           //IconButton(
           //  icon: const Icon(Icons.search),

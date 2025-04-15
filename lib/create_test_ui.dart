@@ -538,185 +538,188 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
-Widget _buildResourceAttachmentSection() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SizedBox(height: 20),
-      const Text(
-        "Attach Resource:",
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-      const SizedBox(height: 10),
-      ElevatedButton(
-        onPressed: _selectExistingResource,
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search),
-            SizedBox(width: 8),
-            Text("Search and Select Resource"),
-          ],
+  Widget _buildResourceAttachmentSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          "Attach Resource:",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-      ),
-      if (_isResourceAttached && _selectedResourceId != null) ...[
         const SizedBox(height: 10),
-        FutureBuilder<Map<String, dynamic>>(
-          future: _fetchResourceDetails(_selectedResourceId!),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            
-            if (snapshot.hasError) {
-              return Text('Error loading resource: ${snapshot.error}');
-            }
-            
-            if (snapshot.hasData) {
-              final resource = snapshot.data!;
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: _buildResourcePreview(resource),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              resource['name'] ?? '',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              resource['resource_photo_link'] ?? resource['resource_link'] ?? '',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.red),
-                        onPressed: _removeAttachedResource,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            return const Text('Loading resource details...');
-          },
+        ElevatedButton(
+          onPressed: _selectExistingResource,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search),
+              SizedBox(width: 8),
+              Text("Search and Select Resource"),
+            ],
+          ),
         ),
+        if (_isResourceAttached && _selectedResourceId != null) ...[
+          const SizedBox(height: 10),
+          FutureBuilder<Map<String, dynamic>>(
+            future: _fetchResourceDetails(_selectedResourceId!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              
+              if (snapshot.hasError) {
+                return Text('Error loading resource: ${snapshot.error}');
+              }
+              
+              if (snapshot.hasData) {
+                final resource = snapshot.data!;
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: _buildResourcePreview(resource),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                resource['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                resource['resource_photo_link'] ?? resource['resource_link'] ?? '',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.red),
+                          onPressed: _removeAttachedResource,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return const Text('Loading resource details...');
+            },
+          ),
+        ],
       ],
-    ],
-  );
-}
-
-Widget _buildResourcePreview(Map<String, dynamic> resource) {
-  final iconPath = resource['resource_photo_link'] ?? '';
-  final filePath = resource['resource_link'] ?? '';
-  final displayName = resource['name'] ?? '';
-
-  // Clean paths by removing leading slashes and encoding special characters
-  final cleanIconPath = iconPath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-  final cleanFilePath = filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-
-  // 1. First try to show icon image if available (resource_photo_link)
-  if (cleanIconPath.isNotEmpty) {
-    final iconUrl = 'http://$serverIP/$cleanIconPath';
-    return Image.network(
-      iconUrl,
-      width: 40,
-      height: 40,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        // If icon fails, try showing the actual file if it's an image
-        return _getFilePreview(cleanFilePath, displayName);
-      },
-    );
-  }
-  
-  // 2. No icon available - try showing the file itself if it's an image
-  return _getFilePreview(cleanFilePath, displayName);
-}
-
-Widget _getFilePreview(String filePath, String displayName) {
-  if (filePath.isEmpty) {
-    return _getFileTypeIcon(null, displayName);
-  }
-
-  // Check common image extensions
-  final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].any(
-    (ext) => filePath.toLowerCase().endsWith(ext)
-  );
-
-  if (isImage) {
-    final imageUrl = 'http://$serverIP/$filePath';
-    return Image.network(
-      imageUrl,
-      width: 40,
-      height: 40,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return _getFileTypeIcon(filePath, displayName);
-      },
     );
   }
 
-  return _getFileTypeIcon(filePath, displayName);
-}
+  Widget _buildResourcePreview(Map<String, dynamic> resource) {
+    final iconPath = resource['resource_photo_link'] ?? '';
+    final filePath = resource['resource_link'] ?? '';
+    final displayName = resource['name'] ?? '';
 
-Widget _getFileTypeIcon(String? filePath, String displayName) {
-  if (filePath == null) {
+    // Clean paths by removing leading slashes and encoding special characters
+    final cleanIconPath = iconPath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
+    final cleanFilePath = filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
+
+    // 1. First try to show icon image if available (resource_photo_link)
+    if (cleanIconPath.isNotEmpty) {
+      final iconUrl = 'http://$serverIP/$cleanIconPath';
+      return Image.network(
+        iconUrl,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          // If icon fails, try showing the actual file if it's an image
+          return _getFilePreview(cleanFilePath, displayName);
+        },
+      );
+    }
+    
+    // 2. No icon available - try showing the file itself if it's an image
+    return _getFilePreview(cleanFilePath, displayName);
+  }
+
+  Widget _getFilePreview(String filePath, String displayName) {
+    if (filePath.isEmpty) {
+      return _getFileTypeIcon(null, displayName);
+    }
+
+    // Check common image extensions
+    final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].any(
+      (ext) => filePath.toLowerCase().endsWith(ext)
+    );
+
+    if (isImage) {
+      final imageUrl = 'http://$serverIP/$filePath';
+      return Image.network(
+        imageUrl,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _getFileTypeIcon(filePath, displayName);
+        },
+      );
+    }
+
+    return _getFileTypeIcon(filePath, displayName);
+  }
+
+  Widget _getFileTypeIcon(String? filePath, String displayName) {
+    if (filePath == null) {
+      return Tooltip(
+        message: displayName,
+        child: const Icon(Icons.insert_drive_file, size: 40),
+      );
+    }
+
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+      return Tooltip(
+        message: displayName,
+        child: const Icon(Icons.picture_as_pdf, size: 40, color: Colors.red),
+      );
+    }
+
     return Tooltip(
       message: displayName,
       child: const Icon(Icons.insert_drive_file, size: 40),
     );
   }
 
-  if (filePath.toLowerCase().endsWith('.pdf')) {
-    return Tooltip(
-      message: displayName,
-      child: const Icon(Icons.picture_as_pdf, size: 40, color: Colors.red),
+  Widget _buildVisibilitySwitch() {
+    return SwitchListTile(
+      title: const Text('Make this test private'),
+      subtitle: const Text('Private tests are only visible to you'),
+      value: _visibility == 0, // True when private (0), false when public (1)
+      onChanged: (bool newValue) {
+        setState(() {
+          // Toggle between 0 and 1
+          _visibility = newValue ? 0 : 1;
+          //print('Visibility toggled to: $_visibility (${newValue ? 'Private' : 'Public'})');
+        });
+      },
     );
   }
-
-  return Tooltip(
-    message: displayName,
-    child: const Icon(Icons.insert_drive_file, size: 40),
-  );
-}
-
-Widget _buildVisibilitySwitch() {
-  return SwitchListTile(
-    title: const Text('Make this test private'),
-    subtitle: const Text('Private tests are only visible to you'),
-    value: _visibility == 0, // True when private (0), false when public (1)
-    onChanged: (bool newValue) {
-      setState(() {
-        // Toggle between 0 and 1
-        _visibility = newValue ? 0 : 1;
-        //print('Visibility toggled to: $_visibility (${newValue ? 'Private' : 'Public'})');
-      });
-    },
-  );
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.initialTestData != null ? "Edit Test" : "Test Creation"),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text(
+          widget.initialTestData != null ? "Edit Test" : "Test Creation",
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
         actions: [
           const SizedBox(width: 1),
           IconButton(
@@ -731,7 +734,9 @@ Widget _buildVisibilitySwitch() {
           ),
         ],
         elevation: 0,
-        backgroundColor: const Color(0x00000000),
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),

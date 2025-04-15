@@ -631,8 +631,11 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isEditMode ? "Edit Resource" : "Create a Resource"),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text(
+          widget.isEditMode ? "Edit Resource" : "Create a Resource",
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
         actions: [
           const SizedBox(width: 1),
           IconButton(
@@ -748,7 +751,6 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
                 onPressed: _isUploading ? null : _uploadResource,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  backgroundColor: Colors.blue[700],
                 ),
                 child: _isUploading
                     ? const SizedBox(

@@ -317,418 +317,421 @@ class _GroupScreenState extends State<GroupScreen> {
     );
   }
 
-// In group_screen.dart - Modify the _buildGroupCard method
-Widget _buildGroupCard(Map<String, dynamic> group) {
-  final groupId = group['id'];
-  final groupName = group['name'] ?? 'Unnamed Group';
-  final isOwner = group['is_owner'] == true;
-  final isMember = group['is_member'] == true;
-  final isBanned = group['user_role'] == 'banned';
-  final memberCount = group['member_count'] ?? 0;
-  final isPrivate = group['visibility'] == 0;
-  int localScore = group['score'] ?? 0;
-  int? localUserVote = group['user_vote'];
-  final iconPath = group['icon_path'];
+  Widget _buildGroupCard(Map<String, dynamic> group) {
+    final groupId = group['id'];
+    final groupName = group['name'] ?? 'Unnamed Group';
+    final isOwner = group['is_owner'] == true;
+    final isMember = group['is_member'] == true;
+    final isBanned = group['user_role'] == 'banned';
+    final memberCount = group['member_count'] ?? 0;
+    final isPrivate = group['visibility'] == 0;
+    int localScore = group['score'] ?? 0;
+    int? localUserVote = group['user_vote'];
+    final iconPath = group['icon_path'];
 
-  return StatefulBuilder(
-    builder: (context, setState) {
-      return Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              spreadRadius: 1,
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+            border: Border.all(
+              color: isBanned ? Colors.red : Colors.grey.shade200,
+              width: isBanned ? 2 : 1,
             ),
-          ],
-          border: Border.all(
-            color: isBanned ? Colors.red : Colors.grey.shade200,
-            width: isBanned ? 2 : 1,
           ),
-        ),
-        child: Stack(
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isBanned)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(10),
-                        topRight: Radius.circular(10),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.block, color: Colors.white, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'BANNED',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
+          child: Stack(
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isBanned)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(10),
+                          topRight: Radius.circular(10),
                         ),
-                      ],
-                    ),
-                  ),
-                SizedBox(height: isBanned ? 4 : 20),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                      color: Colors.transparent,
-                    ),
-                    child: Center(
-                      child: _buildGroupIcon(iconPath),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        groupName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        maxLines: 1,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(Icons.block, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
                           Text(
-                            '$memberCount members',
+                            'BANNED',
                             style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: Colors.grey[600],
                             ),
                           ),
-                          if (isPrivate)
+                        ],
+                      ),
+                    ),
+                  SizedBox(height: isBanned ? 4 : 20),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                        color: Colors.transparent,
+                      ),
+                      child: Center(
+                        child: _buildGroupIcon(iconPath),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          groupName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          maxLines: 1,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
                             Text(
-                              'Private',
+                              '$memberCount members',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
                               ),
                             ),
-                        ],
-                      ),
-                      if (!widget.selectMode) ...[
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: isBanned
-                              ? Container(
-                                  padding: EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      'You are banned from this group',
-                                      style: TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.bold,
+                            if (isPrivate)
+                              Text(
+                                'Private',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (!widget.selectMode) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: isBanned
+                                ? Container(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'You are banned from this group',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                )
-                              : isMember
-                                  ? ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => GroupDetailScreen(
-                                              groupId: groupId,
-                                              groupName: groupName,
+                                  )
+                                : isMember
+                                    ? ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => GroupDetailScreen(
+                                                groupId: groupId,
+                                                groupName: groupName,
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text('Enter Group'),
-                                    )
-                                  : ElevatedButton(
-                                      onPressed: () => _joinGroup(groupId),
-                                      child: const Text('Join Group'),
-                                    ),
+                                          );
+                                        },
+                                        child: const Text('Enter Group'),
+                                      )
+                                    : ElevatedButton(
+                                        onPressed: () => _joinGroup(groupId),
+                                        child: const Text('Join Group'),
+                                      ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // Voting buttons - only show if not banned
+              if (!isBanned)
+                Positioned(
+                  top: isBanned ? 32 : 8,
+                  left: 8,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          spreadRadius: 1,
                         ),
                       ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Voting buttons - only show if not banned
-            if (!isBanned)
-              Positioned(
-                top: isBanned ? 32 : 8,
-                left: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_upward,
-                          color: localUserVote == 1 ? Colors.orange : Colors.grey,
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          final newVote = localUserVote == 1 ? null : 1;
-                          final scoreChange = newVote == null ? -1 : (localUserVote == -1 ? 2 : 1);
-                          
-                          setState(() {
-                            localUserVote = newVote;
-                            localScore = localScore + scoreChange;
-                          });
-
-                          VotingController(
-                            context: context,
-                            itemType: 'group',
-                            itemId: groupId,
-                            currentScore: localScore,
-                            onScoreUpdated: (newScore) {
-                              if (mounted) {
-                                setState(() {
-                                  group['score'] = newScore;
-                                  group['user_vote'] = newVote;
-                                });
-                              }
-                            },
-                          ).upvote();
-                        },
-                      ),
-                      Text(localScore.toString()),
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_downward,
-                          color: localUserVote == -1 ? Colors.blue : Colors.grey,
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          final newVote = localUserVote == -1 ? null : -1;
-                          final scoreChange = newVote == null ? 1 : (localUserVote == 1 ? -2 : -1);
-                          
-                          setState(() {
-                            localUserVote = newVote;
-                            localScore = localScore + scoreChange;
-                          });
-
-                          VotingController(
-                            context: context,
-                            itemType: 'group',
-                            itemId: groupId,
-                            currentScore: localScore,
-                            onScoreUpdated: (newScore) {
-                              if (mounted) {
-                                setState(() {
-                                  group['score'] = newScore;
-                                  group['user_vote'] = newVote;
-                                });
-                              }
-                            },
-                          ).downvote();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            // More options button - only show if not banned
-            if (!isBanned)
-              Positioned(
-                top: isBanned ? 32 : 8,
-                right: 8,
-                child: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'discussions',
-                      child: ListTile(
-                        leading: Icon(Icons.forum, size: 20),
-                        title: Text('Public chat', style: TextStyle(fontSize: 14)),
-                      ),
                     ),
-                    if (isMember)
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_upward,
+                            color: localUserVote == 1 ? Colors.orange : Colors.grey,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            final newVote = localUserVote == 1 ? null : 1;
+                            final scoreChange = newVote == null ? -1 : (localUserVote == -1 ? 2 : 1);
+                            
+                            setState(() {
+                              localUserVote = newVote;
+                              localScore = localScore + scoreChange;
+                            });
+
+                            VotingController(
+                              context: context,
+                              itemType: 'group',
+                              itemId: groupId,
+                              currentScore: localScore,
+                              onScoreUpdated: (newScore) {
+                                if (mounted) {
+                                  setState(() {
+                                    group['score'] = newScore;
+                                    group['user_vote'] = newVote;
+                                  });
+                                }
+                              },
+                            ).upvote();
+                          },
+                        ),
+                        Text(localScore.toString()),
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_downward,
+                            color: localUserVote == -1 ? Colors.blue : Colors.grey,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            final newVote = localUserVote == -1 ? null : -1;
+                            final scoreChange = newVote == null ? 1 : (localUserVote == 1 ? -2 : -1);
+                            
+                            setState(() {
+                              localUserVote = newVote;
+                              localScore = localScore + scoreChange;
+                            });
+
+                            VotingController(
+                              context: context,
+                              itemType: 'group',
+                              itemId: groupId,
+                              currentScore: localScore,
+                              onScoreUpdated: (newScore) {
+                                if (mounted) {
+                                  setState(() {
+                                    group['score'] = newScore;
+                                    group['user_vote'] = newVote;
+                                  });
+                                }
+                              },
+                            ).downvote();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // More options button - only show if not banned
+              if (!isBanned)
+                Positioned(
+                  top: isBanned ? 32 : 8,
+                  right: 8,
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
+                    itemBuilder: (context) => [
                       const PopupMenuItem(
-                        value: 'groupdiscussions',
+                        value: 'discussions',
                         child: ListTile(
                           leading: Icon(Icons.forum, size: 20),
-                          title: Text('Group chat', style: TextStyle(fontSize: 14)),
+                          title: Text('Public chat', style: TextStyle(fontSize: 14)),
                         ),
                       ),
-                    if (!isOwner && isMember) ...[
-                      const PopupMenuItem(
-                        value: 'leave',
-                        child: ListTile(
-                          leading: Icon(Icons.exit_to_app, size: 20, color: Colors.red),
-                          title: Text('Leave Group', style: TextStyle(fontSize: 14, color: Colors.red)),
-                        ),
-                      ),
-                    ],
-                    if (isOwner) ...[
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit, size: 20),
-                          title: Text('Edit Group', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                          title: Text('Delete Group', style: TextStyle(fontSize: 14, color: Colors.red)),
-                        ),
-                      )
-                    ],
-                  ],
-                  onSelected: (value) async {
-                    if (value == 'edit') {
-                      _editGroup(context, group);
-                    } else if (value == 'delete') {
-                      _confirmDeleteGroup(context, groupId, groupName);
-                    } else if (value == 'discussions') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DiscussionScreen(
-                            itemId: groupId,
-                            itemType: 'group',
+                      if (isMember)
+                        const PopupMenuItem(
+                          value: 'groupdiscussions',
+                          child: ListTile(
+                            leading: Icon(Icons.forum, size: 20),
+                            title: Text('Group chat', style: TextStyle(fontSize: 14)),
                           ),
                         ),
-                      );
-                    }
-                    else if (value == 'groupdiscussions') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DiscussionScreen(
-                            itemId: groupId*-1,
-                            itemType: 'group',
+                      if (!isOwner && isMember) ...[
+                        const PopupMenuItem(
+                          value: 'leave',
+                          child: ListTile(
+                            leading: Icon(Icons.exit_to_app, size: 20, color: Colors.red),
+                            title: Text('Leave Group', style: TextStyle(fontSize: 14, color: Colors.red)),
                           ),
                         ),
-                      );
-                    } else if (value == 'leave') {
-                      await _leaveGroup(groupId);
-                    }
-                  },
-                ),
-              )
-          ],
-        ),
-      );
-    },
-  );
-}
+                      ],
+                      if (isOwner) ...[
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit, size: 20),
+                            title: Text('Edit Group', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                            title: Text('Delete Group', style: TextStyle(fontSize: 14, color: Colors.red)),
+                          ),
+                        )
+                      ],
+                    ],
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        _editGroup(context, group);
+                      } else if (value == 'delete') {
+                        _confirmDeleteGroup(context, groupId, groupName);
+                      } else if (value == 'discussions') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DiscussionScreen(
+                              itemId: groupId,
+                              itemType: 'group',
+                            ),
+                          ),
+                        );
+                      }
+                      else if (value == 'groupdiscussions') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DiscussionScreen(
+                              itemId: groupId*-1,
+                              itemType: 'group',
+                            ),
+                          ),
+                        );
+                      } else if (value == 'leave') {
+                        await _leaveGroup(groupId);
+                      }
+                    },
+                  ),
+                )
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.selectMode
           ? AppBar(
-              title: const Text('Select a Group'),
+              title: const Text(
+                'Select a Group',
+                style: TextStyle(color: Colors.deepPurple), // Purple title
+              ),
               leading: IconButton(
-                icon: const Icon(Icons.close),
+                icon: const Icon(Icons.close, color: Colors.black),
                 onPressed: () => Navigator.pop(context),
               ),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              scrolledUnderElevation: 0,
             )
           : AppBar(
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
                 onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
               ),
               title: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search groups...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Theme.of(context).primaryColor),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_searchController.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              _searchGroups('');
-                            },
+                child: Center(
+                  child: TextField(
+                    controller: _searchController,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: 'Search groups...',
+                      hintStyle: TextStyle(color: Colors.grey[600]),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      isDense: true,
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_searchController.text.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
+                                _searchController.clear();
+                                _searchGroups('');
+                              },
+                            ),
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.sort, color: Colors.deepPurple),
+                            color: Colors.white,
+                            onSelected: (value) => _changeSortOrder(value),
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'desc',
+                                child: Text('Newest first',
+                                  style: TextStyle(color: Colors.black)),
+                              ),
+                              PopupMenuItem(
+                                value: 'asc',
+                                child: Text('Oldest first',
+                                  style: TextStyle(color: Colors.black)),
+                              ),
+                            ],
                           ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.sort),
-                          onSelected: (value) => _changeSortOrder(value),
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'desc',
-                              child: Text('Newest first'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'asc',
-                              child: Text('Oldest first'),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    onChanged: _searchGroups,
                   ),
-                  onChanged: _searchGroups,
                 ),
               ),
               actions: [
                 if (!widget.selectMode) ...[
                   TextButton.icon(
-                    icon: const Icon(Icons.add, size: 20),
+                    icon: const Icon(Icons.add, color: Colors.deepPurple, size: 20),
                     label: const Text(
                       'Create Group',
-                      style: TextStyle(fontSize: 14),
+                      style: TextStyle(color: Colors.deepPurple, fontSize: 14),
                     ),
                     style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).primaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     onPressed: () async {
@@ -749,52 +752,71 @@ Widget _buildGroupCard(Map<String, dynamic> group) {
                   ),
                 ],
               ],
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
             ),
-      body: Column(
-        children: [
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredGroups.isEmpty
-                    ? const Center(child: Text('No groups found'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: widget.selectMode ? 1 : 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: widget.selectMode ? 1.5 : 0.9,
-                        ),
-                        itemCount: filteredGroups.length,
-                        itemBuilder: (context, index) {
-                          return _buildGroupCard(filteredGroups[index]);
-                        },
+      body: Padding(
+        padding: EdgeInsets.only(top: 0),
+        child: Column(
+          children: [
+            Expanded(
+              child: isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.deepPurple,
                       ),
-          ),
-          if (!widget.selectMode && !isSearching && totalGroups > itemsPerPage) ...[
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: currentPage > 1
-                        ? () => _goToPage(currentPage - 1)
-                        : null,
-                  ),
-                  Text('Page $currentPage of ${(totalGroups / itemsPerPage).ceil()}'),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: currentPage < (totalGroups / itemsPerPage).ceil() && groups.length >= itemsPerPage
-                        ? () => _goToPage(currentPage + 1)
-                        : null,
-                  ),
-                ],
-              ),
+                    )
+                  : filteredGroups.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No groups found',
+                            style: TextStyle(color: Colors.grey[800]),
+                          ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: widget.selectMode ? 1 : 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: widget.selectMode ? 1.5 : 0.9,
+                          ),
+                          itemCount: filteredGroups.length,
+                          itemBuilder: (context, index) {
+                            return _buildGroupCard(filteredGroups[index]);
+                          },
+                        ),
             ),
+            if (!widget.selectMode && !isSearching && totalGroups > itemsPerPage) ...[
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Colors.deepPurple),
+                      onPressed: currentPage > 1
+                          ? () => _goToPage(currentPage - 1)
+                          : null,
+                    ),
+                    Text(
+                      'Page $currentPage of ${(totalGroups / itemsPerPage).ceil()}',
+                      style: TextStyle(color: Colors.grey[800]),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, color: Colors.deepPurple),
+                      onPressed: currentPage < (totalGroups / itemsPerPage).ceil() && groups.length >= itemsPerPage
+                          ? () => _goToPage(currentPage + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

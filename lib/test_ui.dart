@@ -409,63 +409,62 @@ class _TestScreenState extends State<TestScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
           onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
         ),
         title: Container(
           decoration: BoxDecoration(
-            color: Colors.grey[200],
+            color: Colors.white, 
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
           ),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search tests...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Theme.of(context).primaryColor),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_searchController.text.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _fetchTests();
-                        setState(() {
-                          isSearching = false;
-                        });
-                      },
+          child: Center(
+            child: TextField(
+              controller: _searchController,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                hintText: 'Search tests...',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+                isDense: true,  
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          _fetchTests();
+                          setState(() {
+                            isSearching = false;
+                          });
+                        },
+                      ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.sort, color: Colors.deepPurple),
+                      color: Colors.white,
+                      onSelected: (value) => _changeSortOrder(value),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'desc',
+                          child: Text('Newest first', 
+                            style: TextStyle(color: Colors.black)),
+                        ),
+                        PopupMenuItem(
+                          value: 'asc',
+                          child: Text('Oldest first', 
+                            style: TextStyle(color: Colors.black)),
+                        ),
+                      ],
                     ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.sort),
-                    onSelected: (value) => _changeSortOrder(value),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'desc',
-                        child: Text('Newest first'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'asc',
-                        child: Text('Oldest first'),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
+              onChanged: _searchTests,
             ),
-            onChanged: _searchTests,
           ),
         ),
         actions: [
@@ -476,8 +475,9 @@ class _TestScreenState extends State<TestScreen> {
                 MaterialPageRoute(builder: (context) => const CreateTestScreen()),
               ).then((_) => _fetchTests());
             },
-            icon: const Icon(Icons.add),
-            label: const Text("Create Test"),
+            icon: const Icon(Icons.add, color: Colors.deepPurple),
+            label: const Text("Create Test", 
+              style: TextStyle(color: Colors.deepPurple)),
           ),
           const SizedBox(width: 1),
           IconButton(
@@ -491,50 +491,65 @@ class _TestScreenState extends State<TestScreen> {
           ),
         ],
         elevation: 0,
-        backgroundColor: const Color(0x00000000),
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : filteredTests.isEmpty
-              ? const Center(child: Text('No tests found'))
-              : Column(
-                  children: [
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _fetchTests,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: filteredTests.length,
-                          itemBuilder: (context, index) {
-                            return _buildTestCard(filteredTests[index]);
-                          },
+      body: Padding(
+        padding: const EdgeInsets.only(top: 0),
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator(
+                color: Colors.deepPurple,
+              ))
+            : filteredTests.isEmpty
+                ? Center(
+                    child: Text('No tests found',
+                      style: TextStyle(color: Colors.grey[800])),
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        child: RefreshIndicator(
+                          color: Colors.deepPurple,
+                          onRefresh: _fetchTests,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: filteredTests.length,
+                            itemBuilder: (context, index) {
+                              return _buildTestCard(filteredTests[index]);
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    if (!isSearching && totalTests > itemsPerPage)
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.chevron_left),
-                              onPressed: currentPage > 1
-                                  ? () => _goToPage(currentPage - 1)
-                                  : null,
-                            ),
-                            Text('Page $currentPage of ${(totalTests / itemsPerPage).ceil()}'),
-                            IconButton(
-                              icon: const Icon(Icons.chevron_right),
-                              onPressed: currentPage < (totalTests / itemsPerPage).ceil() && tests.length >= itemsPerPage
-                                  ? () => _goToPage(currentPage + 1)
-                                  : null,
-                            ),
-                          ],
+                      if (!isSearching && totalTests > itemsPerPage)
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left,
+                                  color: Colors.deepPurple),
+                                onPressed: currentPage > 1
+                                    ? () => _goToPage(currentPage - 1)
+                                    : null,
+                              ),
+                              Text('Page $currentPage of ${(totalTests / itemsPerPage).ceil()}',
+                                style: TextStyle(color: Colors.grey[800])),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right,
+                                  color: Colors.deepPurple),
+                                onPressed: currentPage < (totalTests / itemsPerPage).ceil() && 
+                                          tests.length >= itemsPerPage
+                                    ? () => _goToPage(currentPage + 1)
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                  ],
-                ),
+                    ],
+                  ),
+      ),
     );
   }
 }
