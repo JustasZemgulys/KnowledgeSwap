@@ -56,7 +56,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search.php?'
+        'https://juszem1-1.stud.if.ktu.lt/search.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'
@@ -111,7 +111,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = 'https://juszem1-1.stud.if.ktu.lt/$cleanPath';
       
       // Extract file extension
       final fileExt = resourcePath.split('.').last.toLowerCase();
@@ -372,7 +372,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _joinGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/join_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/join_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -403,7 +403,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _leaveGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/leave_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -469,7 +469,7 @@ class _SearchScreenState extends State<SearchScreen> {
         idField = isTest ? 'test_id' : 'resource_id';
       }
 
-      final url = Uri.parse('http://$serverIP/$endpoint');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/$endpoint');
       final response = await http.post(
         url,
         body: {

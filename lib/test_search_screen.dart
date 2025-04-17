@@ -37,7 +37,7 @@ class _TestSearchScreenState extends State<TestSearchScreen> {
   }
 
   Future<void> _performSearch() async {
-    if (serverIP == null) return;
+    //if (serverIP == null) return;
 
     setState(() {
       isLoading = true;
@@ -45,7 +45,7 @@ class _TestSearchScreenState extends State<TestSearchScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search.php?'
+        'https://juszem1-1.stud.if.ktu.lt/search.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'

@@ -68,7 +68,7 @@ class _GroupScreenState extends State<GroupScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_groups.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/get_groups.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
 
       final response = await http.get(url);
 
@@ -130,7 +130,7 @@ class _GroupScreenState extends State<GroupScreen> {
 
   Future<void> _joinGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/join_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/join_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -184,7 +184,7 @@ class _GroupScreenState extends State<GroupScreen> {
 
   Future<void> _leaveGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/leave_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -260,7 +260,7 @@ class _GroupScreenState extends State<GroupScreen> {
 
   Future<void> _deleteGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/delete_group.php');
       final response = await http.post(
         url,
         body: {'group_id': groupId.toString()},
@@ -300,7 +300,7 @@ class _GroupScreenState extends State<GroupScreen> {
 
     return ClipRRect(
       child: Image.network(
-        'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(iconPath)}',
+        'https://juszem1-1.stud.if.ktu.lt/image_proxy.php?path=${Uri.encodeComponent(iconPath)}',
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           return Container(

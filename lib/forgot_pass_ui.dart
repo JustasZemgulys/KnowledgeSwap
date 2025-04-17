@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:knowledgeswap/login_ui.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'get_ip.dart';
 
 Future<String?> sendMail(String recipientEmail, BuildContext context) async {
-  String userIP = await getUserIP();
-  final sendMailApiUrl = 'http://$userIP/send_reminder.php';
+  final sendMailApiUrl = 'https://juszem1-1.stud.if.ktu.lt/send_reminder.php';
   try {
     final response = await http.post(
       Uri.parse(sendMailApiUrl),
@@ -146,10 +144,10 @@ class CodeConfirmationScreen extends StatelessWidget {
 
 class ChangePasswordScreen extends StatefulWidget {
   final String email;
-  ChangePasswordScreen({required this.email});
+  const ChangePasswordScreen({super.key, required this.email});
   @override
-  _ChangePasswordScreenState createState() =>
-      _ChangePasswordScreenState(email: email);
+  // ignore: library_private_types_in_public_api, no_logic_in_create_state
+  _ChangePasswordScreenState createState() => _ChangePasswordScreenState(email: email);
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
@@ -159,8 +157,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   _ChangePasswordScreenState({required this.email});
 
   Future<void> changePassword(String email, String newPassword) async {
-    String userIP = await getUserIP();
-    final String apiUrl = 'http://$userIP/change_password.php';
+    final String apiUrl = 'https://juszem1-1.stud.if.ktu.lt/change_password.php';
     final response = await http.post(
       Uri.parse(apiUrl),
       headers: <String, String>{

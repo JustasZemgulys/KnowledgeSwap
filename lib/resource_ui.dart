@@ -71,7 +71,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
 
       final response = await http.get(url);
 
@@ -141,7 +141,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
     try {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = 'https://juszem1-1.stud.if.ktu.lt/$cleanPath';
       
       // Extract file extension
       final fileExt = resourcePath.split('.').last.toLowerCase();
@@ -208,7 +208,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
   Future<void> _deleteResource(int resourceId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_resource.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/delete_resource.php');
       final response = await http.post(
         url,
         body: {'resource_id': resourceId.toString()},
@@ -242,7 +242,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       );
     }
 
-    final proxyUrl = 'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
+    final proxyUrl = 'https://juszem1-1.stud.if.ktu.lt/image_proxy.php?path=${Uri.encodeComponent(path)}';
 
     // Check if it's a PDF (for the actual resource)
     if (path.toLowerCase().endsWith('.pdf')) {

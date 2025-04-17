@@ -10,7 +10,6 @@ import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
-import 'get_ip.dart';
 import 'package:flutter/foundation.dart' show Uint8List;
 
 class CreateGroupScreen extends StatefulWidget {
@@ -93,8 +92,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> _createGroup() async {
     try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/create_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/create_group.php');
       print(user_info.id.toString());
       var request = http.MultipartRequest('POST', url)
         ..fields['name'] = _groupNameController.text
@@ -138,8 +136,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> _updateGroup() async {
     try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/update_group.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/update_group.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['group_id'] = widget.initialData!['id'].toString()
@@ -191,9 +188,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final iconPath = widget.initialData!['icon_path'].trim();
 
     try {
-      final userIP = await getUserIP();
       final encodedPath = Uri.encodeComponent(iconPath);
-      final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/image_proxy.php?path=$encodedPath');
       
       final response = await http.get(url);
       

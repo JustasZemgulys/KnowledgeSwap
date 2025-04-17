@@ -45,7 +45,7 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search.php?'
+        'https://juszem1-1.stud.if.ktu.lt/search.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'
@@ -86,7 +86,7 @@ Widget _buildResourcePreview(String iconPath, String filePath) {
 
   // 1. Always try to show icon image first if available
   if (iconPath.isNotEmpty) {
-    final iconUrl = 'http://$serverIP/${iconPath.replaceAll(RegExp(r'^/+'), '')}';
+    final iconUrl = 'https://juszem1-1.stud.if.ktu.lt/${iconPath.replaceAll(RegExp(r'^/+'), '')}';
     //debugPrint('Icon URL: $iconUrl');
     
     return Image.network(
@@ -127,7 +127,7 @@ Widget _getFileTypeIcon(String filePath) {
   if (filePath.toLowerCase().endsWith('.jpg') || 
       filePath.toLowerCase().endsWith('.jpeg') ||
       filePath.toLowerCase().endsWith('.png')) {
-    final imageUrl = 'http://$serverIP/${filePath.replaceAll(RegExp(r'^/+'), '')}';
+    final imageUrl = 'https://juszem1-1.stud.if.ktu.lt/${filePath.replaceAll(RegExp(r'^/+'), '')}';
     debugPrint('File image URL: $imageUrl');
     
     return Image.network(

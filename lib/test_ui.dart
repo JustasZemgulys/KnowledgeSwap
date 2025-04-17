@@ -62,14 +62,14 @@ class _TestScreenState extends State<TestScreen> {
   }
 
   Future<void> _fetchTests() async {
-    if (serverIP == null) return;
+    //if (serverIP == null) return;
 
     setState(() {
       isLoading = true;
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_tests.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/get_tests.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -137,7 +137,7 @@ class _TestScreenState extends State<TestScreen> {
 
   Future<void> _deleteTest(int testId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_test.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/delete_test.php');
       final response = await http.post(
         url,
         body: {

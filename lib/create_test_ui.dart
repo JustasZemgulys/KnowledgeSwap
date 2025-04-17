@@ -6,7 +6,6 @@ import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'get_ip.dart';
 import 'package:file_picker/file_picker.dart';
 
 class CreateTestScreen extends StatefulWidget {
@@ -65,12 +64,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   }
 
   Future<void> _loadExistingQuestions() async {
-    serverIP = await getUserIP();
     if (widget.initialTestData == null) return;
 
     try {
-      final userIP = await getUserIP();
-      final url = 'http://$userIP/get_questions.php?test_id=${widget.initialTestData!['id']}';
+      final url = 'https://juszem1-1.stud.if.ktu.lt/get_questions.php?test_id=${widget.initialTestData!['id']}';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
@@ -103,7 +100,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         }
       }
     } catch (e) {
-      print('Error loading questions: $e');
+      //print('Error loading questions: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load questions: $e')),
       );
@@ -121,8 +118,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       return;
     }
 
-    String userIP = await getUserIP();
-    final String url = 'http://$userIP/ai_create_question.php';
+    final String url = 'https://juszem1-1.stud.if.ktu.lt/ai_create_question.php';
 
     bool retry = false;
 
@@ -183,8 +179,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<Map<String, dynamic>> _fetchResourceDetails(int resourceId) async {
     try {
-      final userIP = await getUserIP();
-      final url = 'http://$userIP/get_resource_details.php?resource_id=$resourceId';
+      final url = 'https://juszem1-1.stud.if.ktu.lt/get_resource_details.php?resource_id=$resourceId';
       final response = await http.get(Uri.parse(url));
       
       if (response.statusCode == 200) {
@@ -200,7 +195,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
-  // Add this method to remove attached resource
   void _removeAttachedResource() {
     setState(() {
       _selectedResourceId = null;
@@ -213,11 +207,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<PlatformFile?> _getFileFromPath(String path) async {
     try {
-      final serverIP = await getUserIP();
       
       // Clean the path by removing leading slashes and encoding special characters
       final cleanPath = path.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = 'https://juszem1-1.stud.if.ktu.lt/$cleanPath';
       
       print('Attempting to fetch file from: $fullUrl'); // Debug logging
 
@@ -233,7 +226,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         Uri.parse(fullUrl),
         headers: {
           'Accept': 'application/octet-stream',
-          'Origin': 'http://$serverIP', // Match your server's CORS policy
+          'Origin': 'https://juszem1-1.stud.if.ktu.lt', // Match your server's CORS policy
         },
       );
 
@@ -470,8 +463,11 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       return;
     }
 
+    bool isTestAiMade = _questionFormData.isNotEmpty && 
+      _questionFormData.every((q) => q.aiMade);
+
     try {
-      print('Visibility value being sent: $_visibility'); 
+      //print('Visibility value being sent: $_visibility'); 
       final testData = {
         'name': _titleController.text,
         'description': _descriptionController.text,
@@ -486,18 +482,19 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           };
         }).toList(),
         'userId': userInfo.id,
+        'ai_made': isTestAiMade ? 1 : 0,
         'fk_resource': _selectedResourceId,
         'visibility': _visibility,
       };
 
       if (widget.initialTestData != null) {
         testData['testId'] = widget.initialTestData!['id'];
+        testData['ai_made'] = widget.initialTestData!['ai_made'] ?? (isTestAiMade ? 1 : 0);
       }
 
-      final userIP = await getUserIP();
       final url = widget.initialTestData != null 
-          ? 'http://$userIP/update_test.php'
-          : 'http://$userIP/save_test.php';
+          ? 'https://juszem1-1.stud.if.ktu.lt/update_test.php'
+          : 'https://juszem1-1.stud.if.ktu.lt/save_test.php';
 
       final response = await http.post(
         Uri.parse(url),
@@ -632,7 +629,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
     // 1. First try to show icon image if available (resource_photo_link)
     if (cleanIconPath.isNotEmpty) {
-      final iconUrl = 'http://$serverIP/$cleanIconPath';
+      final iconUrl = 'https://juszem1-1.stud.if.ktu.lt/$cleanIconPath';
       return Image.network(
         iconUrl,
         width: 40,
@@ -660,7 +657,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     );
 
     if (isImage) {
-      final imageUrl = 'http://$serverIP/$filePath';
+      final imageUrl = 'https://juszem1-1.stud.if.ktu.lt/$filePath';
       return Image.network(
         imageUrl,
         width: 40,

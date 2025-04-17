@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'dart:async';
-import 'get_ip.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -69,8 +68,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    String userIP = await getUserIP();
-    final apiUrl = 'http://$userIP/check_existing.php';
+    final apiUrl = 'https://juszem1-1.stud.if.ktu.lt/check_existing.php';
     email = emailController.text;
     password = passwordController.text;
     name = nameController.text;
@@ -122,8 +120,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (verificationCode != null) {
       bool verified = await showVerificationDialog(verificationCode);
       if (verified) {
-        String userIP = await getUserIP();
-        final registerApiUrl = 'http://$userIP/register.php';
+        final registerApiUrl = 'https://juszem1-1.stud.if.ktu.lt/register.php';
         try {
           final registerResponse = await http.post(
             Uri.parse(registerApiUrl),
@@ -135,7 +132,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             }),
           );
 
-          print('Register Response: ${registerResponse.body}');
+          //print('Register Response: ${registerResponse.body}');
 
           if (registerResponse.statusCode == 200) {
             final registerData = jsonDecode(registerResponse.body);
@@ -150,7 +147,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 MaterialPageRoute(builder: (context) => const MainScreen()),
               );
             } else {
-              print('Registration failed: ${registerData['message']}');
+              //print('Registration failed: ${registerData['message']}');
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
@@ -169,18 +166,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
               );
             }
           } else {
-            print('Failed to register user: ${registerResponse.statusCode}');
+            //print('Failed to register user: ${registerResponse.statusCode}');
           }
         } catch (e) {
-          print('Error registering user: $e');
+          //print('Error registering user: $e');
         }
       }
     }
   }
 
   Future<String?> sendMail(String recipientEmail, BuildContext context) async {
-    String userIP = await getUserIP();
-    final sendMailApiUrl = 'http://$userIP/send_email.php';
+    final sendMailApiUrl = 'https://juszem1-1.stud.if.ktu.lt/send_email.php';
     try {
       final response = await http.post(
         Uri.parse(sendMailApiUrl),
@@ -195,15 +191,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (responseData['success']) {
           return responseData['verificationCode'];
         } else {
-          print('Failed to send email: ${responseData['message']}');
+          //print('Failed to send email: ${responseData['message']}');
           return null;
         }
       } else {
-        print('Failed to send email: ${response.statusCode}');
+        //print('Failed to send email: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error sending email: $e');
+      //print('Error sending email: $e');
       return null;
     }
   }

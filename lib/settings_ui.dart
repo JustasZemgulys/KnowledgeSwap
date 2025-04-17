@@ -5,7 +5,6 @@ import 'package:knowledgeswap/welcome.dart';
 import 'dart:convert';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
-import 'get_ip.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({Key? key}) : super(key: key);
@@ -37,8 +36,8 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   void saveUserInfo() async {
-    String userIP = await getUserIP();
-    final apiUrl = 'http://$userIP/settings.php';
+    //String userIP = await getUserIP();
+    final apiUrl = 'https://juszem1-1.stud.if.ktu.lt/settings.php';
 
     // Get the updated user information
     String newName = nameController.text;
@@ -170,8 +169,8 @@ class _SettingScreenState extends State<SettingScreen> {
 
     if (confirm == true) {
       // User confirmed, proceed with account deletion
-      String userIP = await getUserIP();
-      final apiUrl = 'http://$userIP//deleteaccount.php';
+      //String userIP = await getUserIP();
+      final apiUrl = 'https://juszem1-1.stud.if.ktu.lt//deleteaccount.php';
 
       try {
         final response = await http.post(

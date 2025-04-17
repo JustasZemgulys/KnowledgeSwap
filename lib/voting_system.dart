@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'get_ip.dart';
 import 'package:provider/provider.dart';
 import 'user_info_provider.dart';
 
@@ -51,8 +50,8 @@ class VotingController {
     if (userInfo == null) return;
 
     try {
-      final serverIP = await getUserIP();
-      final url = Uri.parse('http://$serverIP/vote.php');
+      //final serverIP = await getUserIP();
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/vote.php');
 
       final response = await http.post(
         url,

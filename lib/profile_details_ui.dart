@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'package:http/http.dart' as http;
-import 'get_ip.dart';
 
 class ProfileDetailsScreen extends StatefulWidget {
   const ProfileDetailsScreen({super.key});
@@ -26,9 +25,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   Future<void> updateProfilePicture(String newImageUrl, int userId) async {
     if (newImageUrl == "") newImageUrl = "default";
 
-    String userIP = await getUserIP();
     final String apiUrl =
-        'http://$userIP/profile_pic.php'; // Update with your server path
+        'https://juszem1-1.stud.if.ktu.lt/profile_pic.php'; // Update with your server path
     final response = await http.post(
       Uri.parse(apiUrl),
       body: {

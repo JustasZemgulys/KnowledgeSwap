@@ -10,7 +10,6 @@ import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
-import 'get_ip.dart';
 import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 
 class CreateResourceScreen extends StatefulWidget {
@@ -116,8 +115,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
   Future<void> _createResource() async {
     try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/create_resource.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/create_resource.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['name'] = _resourceNameController.text
@@ -164,8 +162,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
   Future<void> _updateResource() async {
     try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/update_resource.php');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/update_resource.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['resource_id'] = widget.initialData!['id'].toString()
@@ -229,9 +226,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     //print('Attempting to load icon from path: $iconPath');
 
     try {
-      final userIP = await getUserIP();
       final encodedPath = Uri.encodeComponent(iconPath);
-      final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/image_proxy.php?path=$encodedPath');
       
       //print('Loading icon from: ${url.toString()}');
       
@@ -270,13 +266,12 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     //print('Attempting to load file from path: $filePath');
 
     try {
-      final userIP = await getUserIP();
       final encodedPath = Uri.encodeComponent(filePath);
       final fileType = path.basename(filePath).split('.').last.toLowerCase();
       
       // For images, use the image proxy
       if (fileType == 'jpg' || fileType == 'jpeg' || fileType == 'png') {
-        final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+        final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/image_proxy.php?path=$encodedPath');
         //print('Loading image file from proxy: ${url.toString()}');
         final response = await http.get(url);
         
@@ -297,7 +292,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       }
       
       // For PDFs or if image proxy fails, try direct download
-      final directUrl = Uri.parse('http://$userIP/download_file.php?path=$encodedPath');
+      final directUrl = Uri.parse('https://juszem1-1.stud.if.ktu.lt/download_file.php?path=$encodedPath');
       //print('Loading file from direct URL: ${directUrl.toString()}');
       final response = await http.get(directUrl);
       
@@ -480,8 +475,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     }
 
     try {
-      final userIP = await getUserIP();
-      final url = 'http://$userIP/delete_icon.php';
+      final url = 'https://juszem1-1.stud.if.ktu.lt/delete_icon.php';
       
       final response = await http.post(
         Uri.parse(url),

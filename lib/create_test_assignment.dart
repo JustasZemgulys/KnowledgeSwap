@@ -1,9 +1,7 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
-import 'package:knowledgeswap/get_ip.dart';
 import 'package:knowledgeswap/resource_search_screen.dart';
 import 'package:knowledgeswap/test_search_screen.dart';
 import 'package:knowledgeswap/user_search_screen.dart';
@@ -37,14 +35,12 @@ class _CreateTestAssignmentScreenState extends State<CreateTestAssignmentScreen>
   Map<String, dynamic>? _selectedResource;
   List<dynamic> _selectedUsers = [];
   bool _isLoading = false;
-  String? _serverIP;
   bool _hasOpenDate = false;
   bool _hasDueDate = false;
 
    @override
   void initState() {
     super.initState();
-    _initializeServerIP();
     
     // Initialize form with existing data if in edit mode
     if (widget.initialAssignment != null) {
@@ -76,10 +72,6 @@ class _CreateTestAssignmentScreenState extends State<CreateTestAssignmentScreen>
         };
       }
     }
-  }
-
-  Future<void> _initializeServerIP() async {
-    _serverIP = await getUserIP();
   }
 
   Future<void> _selectTest() async {
@@ -144,7 +136,7 @@ class _CreateTestAssignmentScreenState extends State<CreateTestAssignmentScreen>
     });
 
     try {
-      final url = Uri.parse('http://$_serverIP/${widget.initialAssignment != null ? 'update_test_assignment.php' : 'create_test_assignment.php'}');
+      final url = Uri.parse('https://juszem1-1.stud.if.ktu.lt/${widget.initialAssignment != null ? 'update_test_assignment.php' : 'create_test_assignment.php'}');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

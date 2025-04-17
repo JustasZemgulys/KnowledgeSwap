@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:knowledgeswap/resource_test_config_ui.dart';
 import 'dart:convert';
-import 'get_ip.dart';
 
 class ResourceTestGenerator {
   static Future<void> generateTest({
@@ -19,8 +18,7 @@ class ResourceTestGenerator {
         const SnackBar(content: Text('Generating test questions...')),
       );
 
-      final userIP = await getUserIP();
-      final url = 'http://$userIP/generate_resource_test.php';
+      final url = 'https://juszem1-1.stud.if.ktu.lt/generate_resource_test.php';
 
       // Include the original order index from the config screen
       final questionsWithOrder = questions.asMap().map((index, question) => MapEntry(

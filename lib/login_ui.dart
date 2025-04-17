@@ -7,7 +7,6 @@ import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'forgot_pass_ui.dart';
 import 'approuter.dart';
-import 'get_ip.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -40,10 +39,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      String userIP = await getUserIP();
       final response = await http.post(
-        Uri.parse('http://$userIP/login.php'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('https://juszem1-1.stud.if.ktu.lt/login.php'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'username': usernameController.text,
           'password': passwordController.text,
