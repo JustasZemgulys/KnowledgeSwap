@@ -71,7 +71,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
+      final url = Uri.parse('$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
 
       final response = await http.get(url);
 
@@ -141,31 +141,13 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
     try {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = '$serverIP/$cleanPath';
       
-      // Extract file extension
-      final fileExt = resourcePath.split('.').last.toLowerCase();
-      final mimeTypes = {
-        'pdf': 'application/pdf',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'png': 'image/png',
-      };
-      final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
-
-      // Create download link
-      // ignore: unused_local_variable
-      final anchor = html.AnchorElement(href: fullUrl)
-        ..setAttribute('download', resourceName)
-        ..setAttribute('type', mimeType)
-        ..click();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloading $resourceName...')),
-      );
+      // Open in new window
+      html.window.open(fullUrl, '_blank');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to download resource: $e')),
+        SnackBar(content: Text('Failed to open resource: $e')),
       );
     }
   }
@@ -208,7 +190,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
   Future<void> _deleteResource(int resourceId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_resource.php');
+      final url = Uri.parse('$serverIP/delete_resource.php');
       final response = await http.post(
         url,
         body: {'resource_id': resourceId.toString()},
@@ -242,7 +224,7 @@ class _ResourceScreenState extends State<ResourceScreen> {
       );
     }
 
-    final proxyUrl = 'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
+    final proxyUrl = '$serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
 
     // Check if it's a PDF (for the actual resource)
     if (path.toLowerCase().endsWith('.pdf')) {
@@ -704,11 +686,20 @@ Widget build(BuildContext context) {
             actions: [
               if (!widget.selectMode) ...[
                 TextButton.icon(
-                  onPressed: () => Navigator.pushNamed(
-                    context,
-                    '/create-resource',
-                    arguments: {'returnPage': currentPage, 'returnSort': sortOrder},
-                  ),
+                  onPressed: () async {
+                    final result = await Navigator.pushNamed(
+                      context,
+                      '/create-resource',
+                      arguments: {
+                        'returnPage': currentPage,
+                        'returnSort': sortOrder,
+                      },
+                    );
+                    
+                    if (result == true) {
+                      _fetchResources();
+                    }
+                  },
                   icon: const Icon(Icons.add, color: Colors.deepPurple),
                   label: const Text("Create Resource",
                     style: TextStyle(color: Colors.deepPurple)),

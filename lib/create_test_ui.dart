@@ -44,6 +44,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     _titleController.addListener(_updateTitleCharCount);
     _descriptionController.addListener(_updateDescriptionCharCount);
+    _initializeServerIP();
 
     // Load existing test data if editing
     if (widget.initialTestData != null) {
@@ -57,55 +58,62 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       if (widget.initialTestData!['fk_resource'] != null) {
         _selectedResourceId = widget.initialTestData!['fk_resource'];
         _isResourceAttached = true;
-        // Initialize with the data we already have
         _selectedResourcePath = widget.initialTestData!['resource_link'];
       }
       _loadExistingQuestions();
     }
   }
 
-  Future<void> _loadExistingQuestions() async {
+  Future<void> _initializeServerIP() async {
     serverIP = await getUserIP();
+  }
+
+  Future<void> _loadExistingQuestions() async {
     if (widget.initialTestData == null) return;
 
     try {
       final userIP = await getUserIP();
-      final url = 'http://$userIP/get_questions.php?test_id=${widget.initialTestData!['id']}';
+      final url = '$userIP/get_questions.php?test_id=${widget.initialTestData!['id']}';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          final List<dynamic> questions = responseData['questions'] ?? [];
+        // First validate the JSON
+        final decoded = json.decode(response.body);
+        
+        if (decoded is! Map<String, dynamic>) {
+          throw FormatException('Invalid response format');
+        }
+
+        if (decoded['success'] == true) {
+          final questions = List<Map<String, dynamic>>.from(decoded['questions'] ?? []);
           
-          // Sort questions by their index before creating form data
+          // Sort questions by their index
           questions.sort((a, b) => (a['index'] ?? 0).compareTo(b['index'] ?? 0));
           
           setState(() {
             _questionFormData = questions.map((q) {
-              // Convert database value to proper boolean
-              // Assuming ai_made is 1 for true and 0 for false in the database
-              final bool isAiMade = (q['ai_made'] ?? 0) == 1;
-              
               return _QuestionFormData(
                 index: q['index'] ?? (_questionFormData.length + 1),
-                aiMade: isAiMade,
+                aiMade: (q['ai_made'] ?? 0) == 1,
               )
                 ..questionId = q['id']
                 ..initializeWithExistingData(
-                  q['name'] ?? '',
-                  q['description'] ?? '',
-                  q['answer'] ?? '',
-                  isAiMade,
+                  q['name']?.toString() ?? '',
+                  q['description']?.toString() ?? '',
+                  q['answer']?.toString() ?? '',
+                  (q['ai_made'] ?? 0) == 1,
                 );
             }).toList();
           });
+        } else {
+          throw Exception(decoded['message'] ?? 'Failed to load questions');
         }
+      } else {
+        throw Exception('Server returned status code ${response.statusCode}');
       }
     } catch (e) {
-      print('Error loading questions: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load questions: $e')),
+        SnackBar(content: Text('Failed to load questions: ${e.toString()}')),
       );
     }
   }
@@ -122,7 +130,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
 
     String userIP = await getUserIP();
-    final String url = 'http://$userIP/ai_create_question.php';
+    final String url = '$userIP/ai_create_question.php';
 
     bool retry = false;
 
@@ -165,11 +173,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       if (selectedResource != null && mounted) {
         setState(() {
           _selectedResourceId = selectedResource['id'];
-          //_selectedResourceName = selectedResource['name'];
           _selectedResourcePath = selectedResource['resource_link'];
           _isResourceAttached = true;
-          // No need to fetch details - we already have them from the search
-          //_resourceDetailsFuture = null;
         });
       }
     } catch (e) {
@@ -184,7 +189,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   Future<Map<String, dynamic>> _fetchResourceDetails(int resourceId) async {
     try {
       final userIP = await getUserIP();
-      final url = 'http://$userIP/get_resource_details.php?resource_id=$resourceId';
+      final url = '$userIP/get_resource_details.php?resource_id=$resourceId';
       final response = await http.get(Uri.parse(url));
       
       if (response.statusCode == 200) {
@@ -200,7 +205,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
-  // Add this method to remove attached resource
   void _removeAttachedResource() {
     setState(() {
       _selectedResourceId = null;
@@ -217,14 +221,11 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       
       // Clean the path by removing leading slashes and encoding special characters
       final cleanPath = path.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = '$serverIP/$cleanPath';
       
-      print('Attempting to fetch file from: $fullUrl'); // Debug logging
-
       // First check if the file exists by making a HEAD request
       final headResponse = await http.head(Uri.parse(fullUrl));
       if (headResponse.statusCode != 200) {
-        print('File not found or inaccessible (HTTP ${headResponse.statusCode})');
         return null;
       }
 
@@ -233,7 +234,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         Uri.parse(fullUrl),
         headers: {
           'Accept': 'application/octet-stream',
-          'Origin': 'http://$serverIP', // Match your server's CORS policy
+          'Origin': '$serverIP', // Match your server's CORS policy
         },
       );
 
@@ -259,7 +260,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
-  /// Sends a request to the server and returns the response data.
   Future<Map<String, dynamic>?> _sendRequest(String url, String topic, String parameters) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse(url));
@@ -287,13 +287,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
       var response = await request.send();
 
-      // Log status code and headers
-      //print('Status Code: ${response.statusCode}');
-      //print('Headers: ${response.headers}');
-
       if (response.statusCode == 200) {
         var responseData = await response.stream.bytesToString();
-        //print('Raw Response: $responseData'); // Log the raw response
         return json.decode(responseData);
       } else {
         //print('Server Response: ${response.statusCode}');
@@ -308,7 +303,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
-  /// Processes the response and creates a question form if successful.
   bool _processResponse(Map<String, dynamic> responseData) {
     if (responseData['success'] == true) {
       String content = responseData['full_response']['choices'][0]['message']['content'];
@@ -340,7 +334,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     return false;
   }
 
-  /// Extracts the question from the response content.
   String _extractQuestion(String content) {
     RegExp questionRegex = RegExp(r'Question:\s*(.+)');
     if (questionRegex.hasMatch(content)) {
@@ -349,7 +342,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     return '';
   }
 
-  /// Extracts the options from the response content.
   String _extractOptions(String content) {
     RegExp optionsRegex = RegExp(r'Options:\s*([\s\S]+?)Answer:');
     if (optionsRegex.hasMatch(content)) {
@@ -358,7 +350,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     return '';
   }
 
-  /// Extracts the answer from the response content.
   String _extractAnswer(String content) {
     RegExp answerRegex = RegExp(r'Answer:\s*(.+)');
     if (answerRegex.hasMatch(content)) {
@@ -471,7 +462,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
 
     try {
-      print('Visibility value being sent: $_visibility'); 
       final testData = {
         'name': _titleController.text,
         'description': _descriptionController.text,
@@ -481,12 +471,12 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
             'description': question.questionDescriptionController.text,
             'answer': question.questionAnswerController.text,
             'index': question.index,
-            'id': question.questionId,
+            if (question.questionId != null) 'id': question.questionId,
             'ai_made': question.aiMade ? 1 : 0,
           };
         }).toList(),
         'userId': userInfo.id,
-        'fk_resource': _selectedResourceId,
+        if (_selectedResourceId != null) 'fk_resource': _selectedResourceId,
         'visibility': _visibility,
       };
 
@@ -496,8 +486,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
       final userIP = await getUserIP();
       final url = widget.initialTestData != null 
-          ? 'http://$userIP/update_test.php'
-          : 'http://$userIP/save_test.php';
+          ? '$userIP/update_test.php'
+          : '$userIP/save_test.php';
 
       final response = await http.post(
         Uri.parse(url),
@@ -523,12 +513,12 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           }
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Invalid server response")),
+            SnackBar(content: Text("Invalid server response format: ${e.toString()}")),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Server error: ${response.statusCode}")),
+          SnackBar(content: Text("Server error: ${response.statusCode}\n${response.body}")),
         );
       }
     } catch (e) {
@@ -595,12 +585,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              Text(
-                                resource['resource_photo_link'] ?? resource['resource_link'] ?? '',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
                             ],
                           ),
                         ),
@@ -629,10 +613,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     // Clean paths by removing leading slashes and encoding special characters
     final cleanIconPath = iconPath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
     final cleanFilePath = filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-
+    print('$serverIP/$cleanIconPath');
     // 1. First try to show icon image if available (resource_photo_link)
     if (cleanIconPath.isNotEmpty) {
-      final iconUrl = 'http://$serverIP/$cleanIconPath';
+      final iconUrl = '$serverIP/$cleanIconPath';
       return Image.network(
         iconUrl,
         width: 40,
@@ -660,7 +644,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     );
 
     if (isImage) {
-      final imageUrl = 'http://$serverIP/$filePath';
+      final imageUrl = '$serverIP/$filePath';
       return Image.network(
         imageUrl,
         width: 40,

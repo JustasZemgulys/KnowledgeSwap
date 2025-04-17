@@ -1,18 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
 
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $conn->connect_error]));
-}
+$conn = getDBConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $resourceId = $_POST['resource_id'] ?? 0;
@@ -33,12 +22,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $resource = $result->fetch_assoc();
     
-    // Delete the database entry
-    $deleteQuery = $conn->prepare("DELETE FROM resource WHERE id = ?");
-    $deleteQuery->bind_param("i", $resourceId);
+    // Begin transaction
+    $conn->begin_transaction();
     
-    if ($deleteQuery->execute()) {
-        // Delete the files
+    try {
+        // 1. First remove all group resource references
+        $deleteGroupRefs = $conn->prepare("DELETE FROM group_resource WHERE fk_resource = ?");
+        $deleteGroupRefs->bind_param("i", $resourceId);
+        $deleteGroupRefs->execute();
+        $groupRefsDeleted = $deleteGroupRefs->affected_rows;
+        $deleteGroupRefs->close();
+
+        // 2. Remove resource reference from test assignments
+        $updateAssignments = $conn->prepare("UPDATE test_assignment SET fk_resource = NULL WHERE fk_resource = ?");
+        $updateAssignments->bind_param("i", $resourceId);
+        $updateAssignments->execute();
+        $assignmentsUpdated = $updateAssignments->affected_rows;
+        $updateAssignments->close();
+
+        // 3. Remove resource reference from any tests
+        $updateTests = $conn->prepare("UPDATE test SET fk_resource = NULL WHERE fk_resource = ?");
+        $updateTests->bind_param("i", $resourceId);
+        $updateTests->execute();
+        $testsUpdated = $updateTests->affected_rows;
+        $updateTests->close();
+        
+        // 4. Now safe to delete the main resource entry
+        $deleteQuery = $conn->prepare("DELETE FROM resource WHERE id = ?");
+        $deleteQuery->bind_param("i", $resourceId);
+        $deleteQuery->execute();
+        $resourceDeleted = $deleteQuery->affected_rows;
+        $deleteQuery->close();
+        
+        // Commit the transaction if all operations succeeded
+        $conn->commit();
+        
+        // Delete the files only after successful DB operations
         $deletedFiles = [];
         $basePath = __DIR__ . '/';
         
@@ -60,12 +79,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         echo json_encode([
             'success' => true,
-            'message' => 'Resource deleted successfully',
-            'deleted_files' => $deletedFiles
+            'message' => 'Resource deletion completed',
+            'details' => [
+                'group_references_removed' => $groupRefsDeleted,
+                'test_assignments_updated' => $assignmentsUpdated,
+                'tests_updated' => $testsUpdated,
+                'resource_deleted' => $resourceDeleted,
+                'files_deleted' => count($deletedFiles)
+            ]
         ]);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to delete resource']);
+        
+    } catch (Exception $e) {
+        // Roll back if any error occurred
+        $conn->rollback();
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to delete resource: ' . $e->getMessage(),
+            'error_details' => $conn->error
+        ]);
     }
+} else {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
 }
 
 $conn->close();

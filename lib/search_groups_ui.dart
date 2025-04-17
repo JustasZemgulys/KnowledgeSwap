@@ -48,7 +48,7 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search_groups.php?'
+        '$serverIP/search_groups.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'
@@ -96,7 +96,7 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
       child: ListTile(
         leading: iconPath != null && iconPath.isNotEmpty
             ? Image.network(
-                'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(iconPath)}',
+                '$serverIP/image_proxy.php?path=${Uri.encodeComponent(iconPath)}',
                 width: 50,
                 height: 50,
                 fit: BoxFit.cover,
@@ -225,7 +225,7 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
 
   Future<void> _joinGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/join_group.php');
+      final url = Uri.parse('$serverIP/join_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -264,7 +264,7 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
 
   Future<void> _leaveGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final url = Uri.parse('$serverIP/leave_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -327,7 +327,7 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
 
   Future<void> _deleteGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_group.php');
+      final url = Uri.parse('$serverIP/delete_group.php');
       final response = await http.post(
         url,
         body: {'group_id': groupId.toString()},

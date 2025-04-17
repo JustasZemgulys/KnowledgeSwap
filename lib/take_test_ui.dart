@@ -44,7 +44,7 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
   Future<void> _fetchTestDetails() async {
     try {
       final response = await http.get(Uri.parse(
-          'http://$serverIP/get_test_details.php?id=${widget.testId}'));
+          '$serverIP/get_test_details.php?id=${widget.testId}'));
           
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -58,7 +58,7 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
   Future<void> _fetchQuestions() async {
     try {
       final response = await http.get(Uri.parse(
-          'http://$serverIP/get_questions.php?test_id=${widget.testId}'));
+          '$serverIP/get_questions.php?test_id=${widget.testId}'));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

@@ -1,39 +1,37 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
-
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
+require_once 'db_connect.php';
 
 try {
-    $pdo = new PDO("mysql:host=$servername;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Get PDO connection
+    $pdo = getPDOConnection();
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
-        $testId = $_GET['id'];
-        
+        // Validate ID parameter
+        $testId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if ($testId === false || $testId === null) {
+            throw new Exception("Invalid test ID");
+        }
+
+        // Prepare and execute query
         $stmt = $pdo->prepare("
             SELECT id, name, description, creation_date, ai_made, visibility
             FROM test 
             WHERE id = ?
         ");
         $stmt->execute([$testId]);
-        $test = $stmt->fetch(PDO::FETCH_ASSOC);
+        $test = $stmt->fetch();
 
         if ($test) {
-            echo json_encode(['success' => true, 'test' => $test]);
+            sendJsonResponse(['success' => true, 'test' => $test]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Test not found']);
+            sendJsonResponse(['success' => false, 'message' => 'Test not found'], 404);
         }
+    } else {
+        sendJsonResponse(['success' => false, 'message' => 'Invalid request method or missing ID'], 400);
     }
-} catch(PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-} catch(Exception $e) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+} catch (PDOException $e) {
+    sendJsonResponse(['success' => false, 'message' => 'Database error: ' . $e->getMessage()], 500);
+} catch (Exception $e) {
+    sendJsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
 }
+?>

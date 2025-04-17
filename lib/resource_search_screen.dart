@@ -45,7 +45,7 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search.php?'
+        '$serverIP/search.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'
@@ -55,7 +55,7 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
       );
 
       final response = await http.get(url);
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -79,116 +79,116 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
     _performSearch();
   }
 
-Widget _buildResourcePreview(String iconPath, String filePath) {
-  // Debug print to verify paths
-  //debugPrint('Icon Path: $iconPath');
-  //debugPrint('File Path: $filePath');
+  Widget _buildResourcePreview(String iconPath, String filePath) {
+    // Debug print to verify paths
+    //debugPrint('Icon Path: $iconPath');
+    //debugPrint('File Path: $filePath');
 
-  // 1. Always try to show icon image first if available
-  if (iconPath.isNotEmpty) {
-    final iconUrl = 'http://$serverIP/${iconPath.replaceAll(RegExp(r'^/+'), '')}';
-    //debugPrint('Icon URL: $iconUrl');
-    
-    return Image.network(
-      iconUrl,
-      width: 40,
-      height: 40,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return const SizedBox(
-          width: 40,
-          height: 40,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        debugPrint('Icon load error: $error');
-        return _getFileTypeIcon(filePath);
-      },
-    );
-  }
-  
-  // 2. No icon available - show file type specific icon
-  return _getFileTypeIcon(filePath);
-}
-
-Widget _getFileTypeIcon(String filePath) {
-  if (filePath.isEmpty) {
-    return const Icon(Icons.insert_drive_file, size: 40);
-  }
-  
-  // Show PDF icon only for PDF files with no icon image
-  if (filePath.toLowerCase().endsWith('.pdf')) {
-    return const Icon(Icons.picture_as_pdf, size: 40, color: Colors.red);
-  }
-  
-  // Try to show preview for image files with no icon
-  if (filePath.toLowerCase().endsWith('.jpg') || 
-      filePath.toLowerCase().endsWith('.jpeg') ||
-      filePath.toLowerCase().endsWith('.png')) {
-    final imageUrl = 'http://$serverIP/${filePath.replaceAll(RegExp(r'^/+'), '')}';
-    debugPrint('File image URL: $imageUrl');
-    
-    return Image.network(
-      imageUrl,
-      width: 40,
-      height: 40,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return const SizedBox(
-          width: 40,
-          height: 40,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        debugPrint('File image load error: $error');
-        return const Icon(Icons.insert_drive_file, size: 40);
-      },
-    );
-  }
-  
-  // Default file icon
-  return const Icon(Icons.insert_drive_file, size: 40);
-}
-
-Widget _buildResourceCard(Map<String, dynamic> resource) {
-  final iconPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
-  final filePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
-  final resourceName = resource['name'] ?? 'Untitled Resource';
-  final isOwner = resource['fk_user'] == userInfo.id;
-  final isPrivate = resource['visibility'] == 0 && isOwner;
-
-  return Card(
-    margin: const EdgeInsets.all(8.0),
-    child: ListTile(
-      leading: SizedBox(
+    // 1. Always try to show icon image first if available
+    if (iconPath.isNotEmpty) {
+      final iconUrl = '$serverIP/${iconPath.replaceAll(RegExp(r'^/+'), '')}';
+      //debugPrint('Icon URL: $iconUrl');
+      
+      return Image.network(
+        iconUrl,
         width: 40,
         height: 40,
-        child: _buildResourcePreview(iconPath, filePath),
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Icon load error: $error');
+          return _getFileTypeIcon(filePath);
+        },
+      );
+    }
+    
+    // 2. No icon available - show file type specific icon
+    return _getFileTypeIcon(filePath);
+  }
+
+  Widget _getFileTypeIcon(String filePath) {
+    if (filePath.isEmpty) {
+      return const Icon(Icons.insert_drive_file, size: 40);
+    }
+    
+    // Show PDF icon only for PDF files with no icon image
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+      return const Icon(Icons.picture_as_pdf, size: 40, color: Colors.red);
+    }
+    
+    // Try to show preview for image files with no icon
+    if (filePath.toLowerCase().endsWith('.jpg') || 
+        filePath.toLowerCase().endsWith('.jpeg') ||
+        filePath.toLowerCase().endsWith('.png')) {
+      final imageUrl = '$serverIP/${filePath.replaceAll(RegExp(r'^/+'), '')}';
+      debugPrint('File image URL: $imageUrl');
+      
+      return Image.network(
+        imageUrl,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('File image load error: $error');
+          return const Icon(Icons.insert_drive_file, size: 40);
+        },
+      );
+    }
+    
+    // Default file icon
+    return const Icon(Icons.insert_drive_file, size: 40);
+  }
+
+  Widget _buildResourceCard(Map<String, dynamic> resource) {
+    final iconPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
+    final filePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
+    final resourceName = resource['name'] ?? 'Untitled Resource';
+    final isOwner = resource['fk_user'] == userInfo.id;
+    final isPrivate = resource['visibility'] == 0 && isOwner;
+
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      child: ListTile(
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: _buildResourcePreview(iconPath, filePath),
+        ),
+        title: Text(resourceName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}'),
+            if (isPrivate) 
+              Text('Private', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          ],
+        ),
+        onTap: () {
+          Navigator.pop(context, {
+            'id': resource['id'],
+            'name': resource['name'] ?? 'Untitled Resource',
+            'resource_link': resource['resource_link'] ?? '',
+            'resource_photo_link': resource['resource_photo_link'] ?? '',
+          });
+        },
       ),
-      title: Text(resourceName, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}'),
-          if (isPrivate) 
-            Text('Private', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-        ],
-      ),
-      onTap: () {
-        Navigator.pop(context, {
-          'id': resource['id'],
-          'name': resource['name'] ?? 'Untitled Resource',
-          'resource_link': resource['resource_link'] ?? '',
-          'resource_photo_link': resource['resource_photo_link'] ?? '',
-        });
-      },
-    ),
-  );
-}
+    );
+  }
  
   @override
   Widget build(BuildContext context) {

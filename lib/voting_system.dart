@@ -52,7 +52,7 @@ class VotingController {
 
     try {
       final serverIP = await getUserIP();
-      final url = Uri.parse('http://$serverIP/vote.php');
+      final url = Uri.parse('$serverIP/vote.php');
 
       final response = await http.post(
         url,

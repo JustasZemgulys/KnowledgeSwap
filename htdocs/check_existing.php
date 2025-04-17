@@ -1,25 +1,9 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
-
-// Disable error reporting
 error_reporting(0);
 
-// Database connection details
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
+require_once 'db_connect.php';
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $conn->connect_error]));
-}
+$conn = getDBConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get data from the request

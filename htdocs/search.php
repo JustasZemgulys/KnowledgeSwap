@@ -12,10 +12,9 @@ function log_message($message) {
     file_put_contents(__DIR__ . '/search_debug.log', $logEntry, FILE_APPEND);
 }
 
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 // Start logging
 log_message("Script started");
@@ -28,21 +27,6 @@ $response = [
 ];
 
 try {
-    log_message("Entering try block");
-    
-    $servername = "localhost";
-    $username = "root";
-    $password = "";
-    $dbname = "knowledgeswap";
-    
-    log_message("Attempting database connection");
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
-    log_message("Database connected successfully");
-
     // Validate and sanitize inputs
     $query = isset($_GET['query']) ? trim($conn->real_escape_string($_GET['query'])) : '';
     $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
@@ -163,7 +147,7 @@ $countQueries = [
         throw new Exception("Count execute failed: " . $countStmt->error);
     }
     
-    $total = (int)($countStmt->get_result()->fetch_assoc()['total_count'] ?? 0);
+    $total = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
     $countStmt->close();
     log_message("Count query completed. Total: $total");
 

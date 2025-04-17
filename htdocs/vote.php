@@ -1,8 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -26,16 +25,6 @@ try {
 
     if (!in_array($itemType, ['test', 'resource', 'comment', 'group'])) {
         throw new Exception("Invalid item type");
-    }
-
-    $servername = "localhost";
-    $username = "root";
-    $password = "";
-    $dbname = "knowledgeswap";
-
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed");
     }
 
     // Start transaction

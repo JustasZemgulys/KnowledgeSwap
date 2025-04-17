@@ -56,7 +56,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final url = Uri.parse(
-        'http://$serverIP/search.php?'
+        '$serverIP/search.php?'
         'query=${Uri.encodeComponent(searchQuery)}'
         '&page=$currentPage'
         '&per_page=$itemsPerPage'
@@ -100,7 +100,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _downloadResource(Map<String, dynamic> resource) async {
     final resourcePath = resource['resource_link'] ?? '';
-    final resourceName = resource['name'] ?? 'Untitled Resource';
+    //final resourceName = resource['name'] ?? 'Untitled Resource';
     
     if (resourcePath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,29 +110,17 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     try {
-      final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$serverIP/$cleanPath';
-      
-      // Extract file extension
-      final fileExt = resourcePath.split('.').last.toLowerCase();
-      final mimeTypes = {
-        'pdf': 'application/pdf',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'png': 'image/png',
-      };
-      final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
-
-      // Create download link
-      // ignore: unused_local_variable
-      final anchor = html.AnchorElement(href: fullUrl)
-        ..setAttribute('download', resourceName)
-        ..setAttribute('type', mimeType)
-        ..click();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloading $resourceName...')),
-      );
+      try {
+        final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
+        final fullUrl = '$serverIP/$cleanPath';
+        
+        // Open in new window
+        html.window.open(fullUrl, '_blank');
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open resource: $e')),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to download resource: $e')),
@@ -372,7 +360,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _joinGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/join_group.php');
+      final url = Uri.parse('$serverIP/join_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -403,7 +391,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _leaveGroup(int groupId) async {
     try {
-      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final url = Uri.parse('$serverIP/leave_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -469,7 +457,7 @@ class _SearchScreenState extends State<SearchScreen> {
         idField = isTest ? 'test_id' : 'resource_id';
       }
 
-      final url = Uri.parse('http://$serverIP/$endpoint');
+      final url = Uri.parse('$serverIP/$endpoint');
       final response = await http.post(
         url,
         body: {

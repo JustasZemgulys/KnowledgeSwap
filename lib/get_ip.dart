@@ -7,9 +7,10 @@ Future<String> getUserIP() async {
 
   if (response.statusCode == 200) {
     final data = json.decode(response.body);
-    return data['ip'];
-    //final data = "192.168.138.92";
-    //return data;
+    final ip = data['ip'];
+    return "http://$ip";
+    //return "https://juszem1.stud.if.ktu.lt";
+    //return "https://192.168.138.92";
   } else {
     throw Exception('Failed to load IP');
   }

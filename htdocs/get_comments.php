@@ -1,7 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$db = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -18,11 +18,6 @@ try {
     $itemId = (int)$_GET['item_id'];
     $itemType = $_GET['item_type'];
     $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-    
-    $db = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($db->connect_error) {
-        throw new Exception("Database connection failed");
-    }
 
     // Get all comments with user existence check and voting information
     $query = "

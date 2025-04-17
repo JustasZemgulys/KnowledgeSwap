@@ -1,8 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -18,16 +17,6 @@ try {
     $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
     $sort = in_array(strtoupper($_GET['sort'] ?? ''), ['ASC', 'DESC']) ? $_GET['sort'] : 'DESC';
     $offset = ($page - 1) * $perPage;
-    
-    $servername = "localhost";
-    $username = "root";
-    $password = "";
-    $dbname = "knowledgeswap";
-
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed");
-    }
 
     // First get total count
     $countQuery = "SELECT COUNT(*) as total FROM test WHERE (visibility = 1 OR fk_user = ?)";

@@ -1,18 +1,13 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 error_reporting(0);
 
 $response = ['success' => false, 'message' => 'Request failed'];
 
 try {
-    $conn = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($conn->connect_error) {
-        throw new Exception("DB connection failed");
-    }
 
     $groupId = (int)($_POST['group_id'] ?? 0);
     if ($groupId <= 0) throw new Exception("Invalid group ID");

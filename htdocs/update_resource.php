@@ -1,21 +1,13 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
+require_once 'db_connect.php';
 
-// Enable error reporting only for development
+$conn = getDBConnection();
+
 error_reporting(0);
 
 $response = ['success' => false, 'message' => 'Request failed'];
 
 try {
-    // Database connection
-    $conn = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($conn->connect_error) {
-        throw new Exception("DB connection failed");
-    }
-
     // Validate input
     $resourceId = (int)($_POST['resource_id'] ?? 0);
     if ($resourceId <= 0) throw new Exception("Invalid resource ID");

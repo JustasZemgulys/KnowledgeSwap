@@ -1,24 +1,8 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
 
-// Database connection details
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
+$conn = getDBConnection();
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Handle POST request for user login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get data from the request
     $data = json_decode(file_get_contents('php://input'), true);
@@ -27,8 +11,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $data['password'];
 
     // Validate user credentials
-    $validateUserQuery = "SELECT * FROM user WHERE name = '$username'";
-    $validateUserResult = $conn->query($validateUserQuery);
+	$validateUserQuery = "SELECT * FROM user WHERE name = '$username'";
+
+	$stmt = $conn->prepare("SELECT * FROM user WHERE name = ?");
+	$stmt->bind_param("s", $username);
+	$stmt->execute();
+	$validateUserResult = $stmt->get_result();
 
     if ($validateUserResult->num_rows > 0) {
         // User with the given username exists

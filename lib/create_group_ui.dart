@@ -93,9 +93,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> _createGroup() async {
     try {
-      final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/create_group.php');
-      print(user_info.id.toString());
+      final IP = await getUserIP();
+      final url = Uri.parse('$IP/create_group.php');
       var request = http.MultipartRequest('POST', url)
         ..fields['name'] = _groupNameController.text
         ..fields['description'] = _groupDescriptionController.text
@@ -139,7 +138,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Future<void> _updateGroup() async {
     try {
       final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/update_group.php');
+      final url = Uri.parse('$userIP/update_group.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['group_id'] = widget.initialData!['id'].toString()
@@ -193,7 +192,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     try {
       final userIP = await getUserIP();
       final encodedPath = Uri.encodeComponent(iconPath);
-      final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+      final url = Uri.parse('$userIP/image_proxy.php?path=$encodedPath');
       
       final response = await http.get(url);
       

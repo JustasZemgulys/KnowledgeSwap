@@ -1,24 +1,13 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
 
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
+$conn = getDBConnection();
 
 try {
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 6;
     $sort = in_array(strtoupper($_GET['sort'] ?? ''), ['ASC', 'DESC']) ? $_GET['sort'] : 'DESC';
     $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
 
     // Count total visible resources
     $totalQuery = "SELECT COUNT(*) as total FROM resource 

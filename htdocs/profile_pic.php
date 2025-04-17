@@ -1,22 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
 
-// Database connection details
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
-
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+$conn = getDBConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get new image URL and userId from POST request

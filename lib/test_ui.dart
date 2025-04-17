@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'package:http/http.dart' as http;
+import "package:universal_html/html.dart" as html;
 import 'dart:convert';
 import 'get_ip.dart';
 
@@ -69,7 +70,7 @@ class _TestScreenState extends State<TestScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_tests.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
+      final url = Uri.parse('$serverIP/get_tests.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -137,7 +138,7 @@ class _TestScreenState extends State<TestScreen> {
 
   Future<void> _deleteTest(int testId) async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_test.php');
+      final url = Uri.parse('$serverIP/delete_test.php');
       final response = await http.post(
         url,
         body: {
@@ -194,10 +195,56 @@ class _TestScreenState extends State<TestScreen> {
     final testId = test['id'];
     final testName = test['name'] ?? 'Untitled Test';
     final hasResource = test['has_resource'] ?? false;
+    final resourceId = test['fk_resource'];
     final isPrivate = !(test['visibility'] ?? true);
     final isAIMade = test['ai_made'] ?? false;
     final score = test['score'] ?? 0;
     final userVote = test['user_vote'];
+
+    Future<void> _downloadResource() async {
+      if (resourceId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No resource available')),
+        );
+        return;
+      }
+
+      try {
+        // First fetch the resource details
+          final url = Uri.parse('$serverIP/get_resource_details.php?resource_id=$resourceId');
+          final response = await http.get(url);
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            if (data['success'] == true) {
+              final resource = data['resource'];
+              final resourcePath = resource['resource_link'];
+
+              if (resourcePath.isEmpty) {
+                throw Exception('Resource path is empty');
+              }
+
+              final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
+              final fullUrl = '$serverIP/$cleanPath';
+              
+              // Open in new window
+              html.window.open(fullUrl, '_blank');
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Opening resource...')),
+              );
+          } else {
+            throw Exception(data['message'] ?? 'Failed to fetch resource details');
+          }
+        } else {
+          throw Exception('Server returned status code ${response.statusCode}');
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to download resource: $e')),
+        );
+      }
+    }
 
     return Card(
       elevation: 2,
@@ -356,6 +403,14 @@ class _TestScreenState extends State<TestScreen> {
                         title: Text('View Discussions', style: TextStyle(fontSize: 14)),
                       ),
                     ),
+                    if (hasResource)
+                      const PopupMenuItem(
+                        value: 'open_resource',
+                        child: ListTile(
+                          leading: Icon(Icons.open_in_new, size: 20),
+                          title: Text('Open Resource', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
                     if (isOwner)
                       const PopupMenuItem(
                         value: 'edit',
@@ -393,6 +448,8 @@ class _TestScreenState extends State<TestScreen> {
                           ),
                         ),
                       );
+                    } else if (value == 'open_resource') {
+                      await _downloadResource();
                     }
                   },
                 ),

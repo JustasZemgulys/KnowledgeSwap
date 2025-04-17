@@ -1,17 +1,10 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
-
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Handle OPTIONS request (CORS preflight)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('HTTP/1.1 200 OK');
-    exit();
-}
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -36,12 +29,6 @@ try {
     
     $groupId = (int)$data['group_id'];
     $userId = (int)$data['user_id'];
-    
-    $conn = new mysqli("localhost", "root", "", "knowledgeswap");
-    
-    if ($conn->connect_error) {
-        throw new Exception("Connection failed: " . $conn->connect_error);
-    }
     
     // Check if target user exists in group
     $stmt = $conn->prepare("SELECT role FROM group_member WHERE fk_group = ? AND fk_user = ?");

@@ -58,8 +58,6 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
           ? path.basename(widget.initialData!['resource_link']) 
           : null;
       _fileType = _fileName?.split('.').last.toLowerCase();
-
-      //print('Initial file path: ${widget.initialData!['resource_link']}');
     }
     
     _resourceNameController.addListener(_updateResourceNameCharCount);
@@ -117,7 +115,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   Future<void> _createResource() async {
     try {
       final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/create_resource.php');
+      final url = Uri.parse('$userIP/create_resource.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['name'] = _resourceNameController.text
@@ -146,7 +144,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       if (response.statusCode == 200) {
         if (decodedResponse['success'] == true) {
           _showSuccessMessage('Resource uploaded successfully!');
-          _resetForm();
+          Navigator.pop(context, true); // Return true to indicate success
+          return;
         } else {
           _showErrorSnackBar('Error: ${decodedResponse['message']}');
         }
@@ -165,7 +164,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   Future<void> _updateResource() async {
     try {
       final userIP = await getUserIP();
-      final url = Uri.parse('http://$userIP/update_resource.php');
+      final url = Uri.parse('$userIP/update_resource.php');
 
       var request = http.MultipartRequest('POST', url)
         ..fields['resource_id'] = widget.initialData!['id'].toString()
@@ -201,6 +200,12 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
         final jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success'] == true) {
           Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Resource updated successfully!"),
+              backgroundColor: Colors.green,
+            ),
+          );
         } else {
           _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
         }
@@ -231,7 +236,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     try {
       final userIP = await getUserIP();
       final encodedPath = Uri.encodeComponent(iconPath);
-      final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+      final url = Uri.parse('$userIP/image_proxy.php?path=$encodedPath');
       
       //print('Loading icon from: ${url.toString()}');
       
@@ -276,7 +281,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       
       // For images, use the image proxy
       if (fileType == 'jpg' || fileType == 'jpeg' || fileType == 'png') {
-        final url = Uri.parse('http://$userIP/image_proxy.php?path=$encodedPath');
+        final url = Uri.parse('$userIP/image_proxy.php?path=$encodedPath');
         //print('Loading image file from proxy: ${url.toString()}');
         final response = await http.get(url);
         
@@ -297,8 +302,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       }
       
       // For PDFs or if image proxy fails, try direct download
-      final directUrl = Uri.parse('http://$userIP/download_file.php?path=$encodedPath');
-      //print('Loading file from direct URL: ${directUrl.toString()}');
+      final directUrl = Uri.parse('$userIP/download_file.php?path=$encodedPath');
       final response = await http.get(directUrl);
       
       if (response.statusCode == 200) {
@@ -312,18 +316,13 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
             bytes: response.bodyBytes,
           );
         });
-        //print('Successfully loaded file via direct download');
       } else {
-        //print('Failed to load file. Status: ${response.statusCode}');
-        // Still set the filename even if we can't load the content
         setState(() {
           _fileName = path.basename(filePath);
           _fileType = fileType;
         });
       }
     } catch (e) {
-      //print('Error loading file: $e');
-      // Still set the filename even if we can't load the content
       setState(() {
         _fileName = path.basename(widget.initialData!['resource_link']);
         _fileType = _fileName?.split('.').last.toLowerCase();
@@ -352,53 +351,42 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
   Future<void> _pickFile() async {
     try {
-      print('Starting file picker...');
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
 
       if (result != null && result.files.isNotEmpty) {
-        print('File selected: ${result.files.first.name}');
         setState(() {
           _selectedFile = result.files.first;
           _fileName = _selectedFile!.name;
           _fileType = _selectedFile!.extension?.toLowerCase();
           _fileBytes = _selectedFile!.bytes;
         });
-      } else {
-        print('No file selected or selection cancelled');
       }
     } catch (e) {
-      print('Error in _pickFile: $e');
       _showErrorSnackBar('Error picking file: $e');
     }
   }
 
   Future<void> _takePhoto() async {
     if (kIsWeb) {
-      print('Camera not supported on web platform');
       _showErrorSnackBar('Camera not supported on web');
       return;
     }
 
     try {
-      print('Launching camera...');
       final pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
       
       if (pickedFile != null) {
-        print('Photo taken: ${pickedFile.path}');
         final file = File(pickedFile.path);
         setState(() {
           _fileName = path.basename(pickedFile.path);
           _fileType = 'jpg';
           _fileBytes = file.readAsBytesSync();
         });
-      } else {
-        print('No photo taken or operation cancelled');
       }
     } catch (e) {
-      print('Error in _takePhoto: $e');
       _showErrorSnackBar('Error taking photo: $e');
     }
   }
@@ -439,7 +427,6 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
   }
 
   void _showSuccessMessage(String message) {
-    print('Showing success message: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -447,25 +434,6 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
         duration: const Duration(seconds: 5),
       ),
     );
-  }
-  
-  void _resetForm() {
-    print('Resetting form...');
-    _resourceNameController.clear();
-    _resourceDescriptionController.clear();
-    setState(() {
-      _selectedFile = null;
-      _fileName = null;
-      _fileType = null;
-      _fileBytes = null;
-      _iconName = null;
-      _iconType = null;
-      _iconBytes = null;
-      _isPrivate = false;
-      _resourceNameCharCount = 0;
-      _resourceDescriptionCharCount = 0;
-    });
-    print('Form reset complete');
   }
 
   Future<void> _deleteIcon() async {
@@ -481,7 +449,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
     try {
       final userIP = await getUserIP();
-      final url = 'http://$userIP/delete_icon.php';
+      final url = '$userIP/delete_icon.php';
       
       final response = await http.post(
         Uri.parse(url),

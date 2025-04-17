@@ -1,8 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 // Enable error reporting for debugging (remove in production)
 error_reporting(E_ALL);
@@ -16,21 +15,6 @@ $response = [
 ];
 
 try {
-    // Database configuration
-    $servername = "localhost";
-    $username = "root";
-    $username = "root";
-    $password = "";
-    $dbname = "knowledgeswap";
-
-    // Create connection
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    
-    // Check connection
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
-
     // Get parameters with defaults
     $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 6;

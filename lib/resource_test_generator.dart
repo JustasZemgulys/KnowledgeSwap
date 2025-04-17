@@ -20,7 +20,7 @@ class ResourceTestGenerator {
       );
 
       final userIP = await getUserIP();
-      final url = 'http://$userIP/generate_resource_test.php';
+      final url = '$userIP/generate_resource_test.php';
 
       // Include the original order index from the config screen
       final questionsWithOrder = questions.asMap().map((index, question) => MapEntry(

@@ -1,8 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 // Error reporting for development
 error_reporting(E_ALL);
@@ -23,31 +22,12 @@ function log_message($message) {
 }
 
 try {
-    // Database configuration
-    $servername = "localhost";
-    $username = "root";
-    $password = "";
-    $dbname = "knowledgeswap";
-
-    log_message("Attempting database connection");
-    
-    // Create connection
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    
-    // Check connection
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
-
     // Get and validate parameters
     $groupId = isset($_GET['group_id']) ? (int)$_GET['group_id'] : 0;
     $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 
     log_message("Received parameters - group_id: $groupId, user_id: $userId");
 
-    if ($groupId <= 0 || $userId <= 0) {
-        throw new Exception("Valid group_id and user_id are required");
-    }
 
 	$query = "
 		SELECT 
@@ -105,6 +85,7 @@ try {
 		SELECT 
 			u.id,
 			u.name,
+			u.email,
 			u.imageURL as profile_picture,
 			gm.role
 		FROM group_member gm

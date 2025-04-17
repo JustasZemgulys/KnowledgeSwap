@@ -12,16 +12,9 @@ require 'vendor/autoload.php';
 
 $apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
 
-// Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "knowledgeswap";
+require_once 'db_connect.php';
 
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $conn->connect_error]));
-}
+$conn = getDBConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'models/user_info.dart';
 import 'user_info_provider.dart';
 import 'forgot_pass_ui.dart';
-import 'approuter.dart';
+import 'app_router.dart';
 import 'get_ip.dart';
 
 class LoginPage extends StatefulWidget {
@@ -42,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       String userIP = await getUserIP();
       final response = await http.post(
-        Uri.parse('http://$userIP/login.php'),
+        Uri.parse('$userIP/login.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': usernameController.text,
@@ -125,11 +125,13 @@ class _LoginPageState extends State<LoginPage> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         elevation: 0.0,
-        backgroundColor: const Color(0x00000000),
+        backgroundColor: Colors.transparent,
       ),
       body: Container(
-        width: MediaQuery.of(context).size.width,
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
+          color: Color(0xFF6e10a6), // Purple background fallback
           image: DecorationImage(
             image: AssetImage('assets/welcomeBG.png'),
             fit: BoxFit.cover,

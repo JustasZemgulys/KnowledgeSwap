@@ -50,7 +50,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$_serverIP/get_group_details.php?group_id=${widget.groupId}');
+      final url = Uri.parse('$_serverIP/get_group_details.php?group_id=${widget.groupId}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -117,7 +117,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             ? NetworkImage(
                 user['profile_picture'].startsWith('http')
                     ? user['profile_picture']
-                    : 'http://$_serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
+                    : '$_serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
               )
             : null,
         child: user['profile_picture'] == null 

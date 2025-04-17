@@ -58,7 +58,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
   Future<void> _fetchItemDetails() async {
     try {
       final response = await http.get(Uri.parse(
-          'http://$serverIP/get_item_details.php?id=${widget.itemId}&type=${widget.itemType}'));
+          '$serverIP/get_item_details.php?id=${widget.itemId}&type=${widget.itemType}'));
           
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -72,7 +72,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
   Future<void> _fetchComments() async {
     try {
       final response = await http.get(Uri.parse(
-        'http://$serverIP/get_comments.php?item_id=${widget.itemId}&item_type=${widget.itemType}&user_id=${userInfo.id}'));
+        '$serverIP/get_comments.php?item_id=${widget.itemId}&item_type=${widget.itemType}&user_id=${userInfo.id}'));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -116,7 +116,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
       }
 
       final response = await http.post(
-        Uri.parse('http://$serverIP/post_comment.php'),
+        Uri.parse('$serverIP/post_comment.php'),
         body: body,
       );
 
@@ -198,7 +198,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://$serverIP/update_comment.php'),
+        Uri.parse('$serverIP/update_comment.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'comment_id': commentId,
@@ -230,7 +230,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
       });
 
       final response = await http.post(
-        Uri.parse('http://$serverIP/delete_comment.php'),
+        Uri.parse('$serverIP/delete_comment.php'),
         body: {
           'comment_id': commentId.toString(),
           'user_id': userInfo.id.toString(),

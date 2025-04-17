@@ -81,7 +81,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/get_group_details.php?group_id=${widget.groupId}&user_id=${user_info.id}');
+      final url = Uri.parse('$serverIP/get_group_details.php?group_id=${widget.groupId}&user_id=${user_info.id}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -110,7 +110,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (serverIP == null) return;
 
     try {
-      final url = Uri.parse('http://$serverIP/get_group_resources.php?group_id=${widget.groupId}');
+      final url = Uri.parse('$serverIP/get_group_resources.php?group_id=${widget.groupId}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -128,7 +128,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _removeUser(int userId) async {
     try {
-      final url = Uri.parse('http://$serverIP/remove_user_from_group.php');
+      final url = Uri.parse('$serverIP/remove_user_from_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -160,7 +160,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _banUser(int userId) async {
     try {
-      final url = Uri.parse('http://$serverIP/ban_user_from_group.php');
+      final url = Uri.parse('$serverIP/ban_user_from_group.php');
       
       final response = await http.post(
         url,
@@ -198,7 +198,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _unbanUser(int userId) async {
     try {
-      final url = Uri.parse('http://$serverIP/remove_user_from_group.php');
+      final url = Uri.parse('$serverIP/remove_user_from_group.php');
       
       final response = await http.post(
         url,
@@ -236,7 +236,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _updateUserRole(int userId, String role) async {
     try {
-      final url = Uri.parse('http://$serverIP/update_group_member_role.php');
+      final url = Uri.parse('$serverIP/update_group_member_role.php');
       
       final response = await http.post(
         url,
@@ -288,7 +288,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     });
 
     try {
-      final url = Uri.parse('http://$serverIP/invite_user_to_group.php');
+      final url = Uri.parse('$serverIP/invite_user_to_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -393,7 +393,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   
   Future<void> _leaveGroup() async {
     try {
-      final url = Uri.parse('http://$serverIP/leave_group.php');
+      final url = Uri.parse('$serverIP/leave_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -449,7 +449,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _deleteGroup() async {
     try {
-      final url = Uri.parse('http://$serverIP/delete_group.php');
+      final url = Uri.parse('$serverIP/delete_group.php');
       final response = await http.post(
         url,
         body: {'group_id': widget.groupId.toString()},
@@ -500,7 +500,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       if (selectedResource != null && mounted) {
         final resourceId = selectedResource['id'];
         
-        final url = Uri.parse('http://$serverIP/attach_resource_to_group.php');
+        final url = Uri.parse('$serverIP/attach_resource_to_group.php');
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -533,7 +533,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _removeResourceFromGroup(int resourceId) async {
     try {
-      final url = Uri.parse('http://$serverIP/remove_resource_from_group.php');
+      final url = Uri.parse('$serverIP/remove_resource_from_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -567,7 +567,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (serverIP == null) return;
 
     try {
-      final url = Uri.parse('http://$serverIP/get_group_tests.php?group_id=${widget.groupId}');
+      final url = Uri.parse('$serverIP/get_group_tests.php?group_id=${widget.groupId}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -585,7 +585,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Future<void> _removeTestFromGroup(int testId) async {
     try {
-      final url = Uri.parse('http://$serverIP/remove_test_from_group.php');
+      final url = Uri.parse('$serverIP/remove_test_from_group.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -627,7 +627,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       if (selectedTest != null && mounted) {
         final testId = selectedTest['id'];
         
-        final url = Uri.parse('http://$serverIP/attach_test_to_group.php');
+        final url = Uri.parse('$serverIP/attach_test_to_group.php');
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -972,7 +972,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
     try {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$serverIP/$cleanPath';
+      final fullUrl = '$serverIP/$cleanPath';
       
       // For web, open in new tab
       if (kIsWeb) {
@@ -997,10 +997,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           ..setAttribute('type', mimeType)
           ..click();
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening $resourceName...')),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to open resource: $e')),
@@ -1020,7 +1016,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       );
     }
 
-    final proxyUrl = 'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
+    final proxyUrl = '$serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
 
     if (path.toLowerCase().endsWith('.pdf')) {
       return const Column(
@@ -1053,7 +1049,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (serverIP == null) return;
 
     try {
-      final url = Uri.parse('http://$serverIP/get_group_test_assignments.php?group_id=${widget.groupId}');
+      final url = Uri.parse('$serverIP/get_group_test_assignments.php?group_id=${widget.groupId}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -1344,7 +1340,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                         ? NetworkImage(
                                             member['profile_picture'].startsWith('http')
                                                 ? member['profile_picture']
-                                                : 'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(member['profile_picture'])}',
+                                                : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(member['profile_picture'])}',
                                           )
                                         : null,
                                     child: member['profile_picture'] == null 
@@ -1419,7 +1415,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                           ? NetworkImage(
                                               user['profile_picture'].startsWith('http')
                                                   ? user['profile_picture']
-                                                  : 'http://$serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
+                                                  : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
                                             )
                                           : null,
                                       child: user['profile_picture'] == null 

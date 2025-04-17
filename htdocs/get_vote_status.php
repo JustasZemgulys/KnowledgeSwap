@@ -4,10 +4,9 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-// Set proper headers first
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 // Default response structure
 $response = [
@@ -31,12 +30,6 @@ try {
     $validTypes = ['test', 'resource', 'comment'];
     if (!in_array($itemType, $validTypes)) {
         throw new Exception("Invalid item type");
-    }
-
-    // Database connection with error handling
-    $conn = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($conn->connect_error) {
-        throw new Exception("DB connection failed");
     }
 
     // 1. Get user's vote (returns 0 if none exists)

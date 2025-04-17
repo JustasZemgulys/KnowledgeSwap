@@ -1,10 +1,17 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$conn = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
+
+function log_message($message) {
+    $timestamp = date('Y-m-d H:i:s');
+    $logEntry = "[$timestamp] $message\n";
+    file_put_contents(__DIR__ . '/update_test_debug.log', $logEntry, FILE_APPEND);
+}
+
+log_message("Update started");
 
 try {
     // Get and decode input
@@ -15,71 +22,66 @@ try {
         throw new Exception("Invalid JSON: " . json_last_error_msg());
     }
     
+    log_message("Received data: " . print_r($input, true));
+    
     if (!$input || !isset($input['testId']) || !isset($input['userId'])) {
         throw new Exception("Missing required fields");
     }
 
-    $db = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($db->connect_error) {
-        throw new Exception("Database connection failed");
-    }
-
-    $db->begin_transaction();
+    $conn->begin_transaction();
 
     try {
-		$resourceId = isset($input['fk_resource']) ? $input['fk_resource'] : null;
+        $resourceId = isset($input['fk_resource']) ? $input['fk_resource'] : null;
 		$visibility = isset($input['visibility']) ? (int)$input['visibility'] : 1; 
-		
-        // Update test
-        $stmt = $db->prepare("UPDATE test SET 
-        name = ?, 
-        description = ?,
-		fk_resource = ?,
-		visibility = ?
-        WHERE id = ? AND fk_user = ?");
-		$stmt->bind_param("ssiiii", 
-			$input['name'], 
-			$input['description'],
-			$resourceId,
-			$visibility,			
-			$input['testId'], 
-			$input['userId']);
-		
-		if (!$stmt->execute()) {
-			throw new Exception("Test update failed: " . $db->error);
+
+		// Update test with NULL handling
+		if ($resourceId === null) {
+			$stmt = $conn->prepare("UPDATE test SET 
+				name = ?, 
+				description = ?,
+				fk_resource = NULL,
+				visibility = ?
+				WHERE id = ? AND fk_user = ?");
+			$stmt->bind_param("ssiii", 
+				$input['name'], 
+				$input['description'],
+				$visibility,            
+				$input['testId'], 
+				$input['userId']);
+		} else {
+			$stmt = $conn->prepare("UPDATE test SET 
+				name = ?, 
+				description = ?,
+				fk_resource = ?,
+				visibility = ?
+				WHERE id = ? AND fk_user = ?");
+			$stmt->bind_param("ssiiii", 
+				$input['name'], 
+				$input['description'],
+				$resourceId,
+				$visibility,            
+				$input['testId'], 
+				$input['userId']);
 		}
-		
-		// Update resource link
-		//$stmt = $db->prepare("DELETE FROM test_resource WHERE fk_test = ?");
-		//$stmt->bind_param("i", $input['testId']);
-		//if (!$stmt->execute()) {
-		//	throw new Exception("Resource link cleanup failed: " . $db->error);
-		//}
-		
-		//if (!empty($input['fk_resource'])) {
-		//	$stmt = $db->prepare("INSERT INTO test_resource 
-		//		(fk_test, fk_resource) 
-		//		VALUES (?, ?)");
-		//	$stmt->bind_param("ii", $input['testId'], $input['fk_resource']);
-		//	if (!$stmt->execute()) {
-		//		throw new Exception("Resource link failed: " . $db->error);
-		//	}
-		//	$stmt->close();
-		//}
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Test update failed: " . $conn->error);
+        }
+        $stmt->close();
 
         // Process questions
         if (isset($input['questions']) && is_array($input['questions'])) {
             foreach ($input['questions'] as $question) {
                 if (isset($question['id'])) {
                     // Update existing question
-                    $stmt = $db->prepare("UPDATE question SET 
+                    $stmt = $conn->prepare("UPDATE question SET 
                         name = ?, 
                         description = ?, 
                         answer = ?,
                         `index` = ?,
                         ai_made = ?
                         WHERE id = ? AND fk_test = ?");
-                    $aiMade = $question['ai_made'] ?? 0; // Convert to variable first
+                    $aiMade = $question['ai_made'] ?? 0;
                     $stmt->bind_param("sssiiii", 
                         $question['title'],
                         $question['description'],
@@ -90,10 +92,10 @@ try {
                         $input['testId']);
                 } else {
                     // Insert new question
-                    $stmt = $db->prepare("INSERT INTO question 
+                    $stmt = $conn->prepare("INSERT INTO question 
                         (name, description, answer, `index`, fk_test, fk_user, creation_date, ai_made) 
                         VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)");
-                    $aiMade = $question['ai_made'] ?? 0; // Convert to variable first
+                    $aiMade = $question['ai_made'] ?? 0;
                     $stmt->bind_param("sssiiii", 
                         $question['title'],
                         $question['description'],
@@ -105,21 +107,24 @@ try {
                 }
                 
                 if (!$stmt->execute()) {
-                    throw new Exception("Question operation failed: " . $db->error);
+                    throw new Exception("Question operation failed: " . $conn->error);
                 }
+                $stmt->close();
             }
         }
 
-        $db->commit();
+        $conn->commit();
         $response = ['success' => true, 'message' => 'Test updated successfully'];
     } catch (Exception $e) {
-        $db->rollback();
+        $conn->rollback();
         throw $e;
     }
 } catch (Exception $e) {
     $response['message'] = $e->getMessage();
+    log_message("Error: " . $e->getMessage());
 }
 
-if (isset($db)) $db->close();
+if (isset($conn)) $conn->close();
+header('Content-Type: application/json');
 echo json_encode($response);
 ?>

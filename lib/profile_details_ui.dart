@@ -28,7 +28,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
     String userIP = await getUserIP();
     final String apiUrl =
-        'http://$userIP/profile_pic.php'; // Update with your server path
+        '$userIP/profile_pic.php'; // Update with your server path
     final response = await http.post(
       Uri.parse(apiUrl),
       body: {

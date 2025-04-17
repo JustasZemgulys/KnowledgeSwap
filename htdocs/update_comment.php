@@ -1,7 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$db = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -38,11 +38,6 @@ try {
     
     if (empty($text)) {
         throw new Exception("Comment text cannot be empty");
-    }
-    
-    $db = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($db->connect_error) {
-        throw new Exception("Database connection failed");
     }
     
     // Check if comment exists and user owns it

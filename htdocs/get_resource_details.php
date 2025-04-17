@@ -1,7 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$db = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -10,11 +10,6 @@ try {
         throw new Exception("Invalid resource ID");
     }
     $resourceId = (int)$_GET['resource_id'];
-    
-    $db = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($db->connect_error) {
-        throw new Exception("Database connection failed");
-    }
 
     // Get resource details including resource_photo_link
     $stmt = $db->prepare("SELECT id, name, resource_link, resource_photo_link FROM resource WHERE id = ?");

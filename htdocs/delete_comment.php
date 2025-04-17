@@ -1,7 +1,7 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Content-Type: application/json; charset=UTF-8");
+require_once 'db_connect.php';
+
+$db = getDBConnection();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -26,11 +26,6 @@ try {
     
     $commentId = (int)$data['comment_id'];
     $userId = (int)$data['user_id'];
-    
-    $db = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($db->connect_error) {
-        throw new Exception("Database connection failed");
-    }
     
     // Check if user owns the comment
     $stmt = $db->prepare("SELECT fk_user FROM comment WHERE id = ?");

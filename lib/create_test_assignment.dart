@@ -144,7 +144,7 @@ class _CreateTestAssignmentScreenState extends State<CreateTestAssignmentScreen>
     });
 
     try {
-      final url = Uri.parse('http://$_serverIP/${widget.initialAssignment != null ? 'update_test_assignment.php' : 'create_test_assignment.php'}');
+      final url = Uri.parse('$_serverIP/${widget.initialAssignment != null ? 'update_test_assignment.php' : 'create_test_assignment.php'}');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

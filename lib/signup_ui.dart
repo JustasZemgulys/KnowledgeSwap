@@ -70,7 +70,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     String userIP = await getUserIP();
-    final apiUrl = 'http://$userIP/check_existing.php';
+    final apiUrl = '$userIP/check_existing.php';
     email = emailController.text;
     password = passwordController.text;
     name = nameController.text;
@@ -123,7 +123,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       bool verified = await showVerificationDialog(verificationCode);
       if (verified) {
         String userIP = await getUserIP();
-        final registerApiUrl = 'http://$userIP/register.php';
+        final registerApiUrl = '$userIP/register.php';
         try {
           final registerResponse = await http.post(
             Uri.parse(registerApiUrl),
@@ -180,7 +180,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<String?> sendMail(String recipientEmail, BuildContext context) async {
     String userIP = await getUserIP();
-    final sendMailApiUrl = 'http://$userIP/send_email.php';
+    final sendMailApiUrl = '$userIP/send_email.php';
     try {
       final response = await http.post(
         Uri.parse(sendMailApiUrl),
@@ -273,14 +273,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         elevation: 0.0,
-        backgroundColor: const Color(0x00000000),
+        backgroundColor: Colors.transparent,
       ),
       body: Container(
-        width: MediaQuery.of(context).size.width, // Full screen width
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
+          color: Color(0xFF6e10a6),
           image: DecorationImage(
             image: AssetImage('assets/welcomeBG.png'),
-            fit: BoxFit.cover, // Ensure the image covers the entire space
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(

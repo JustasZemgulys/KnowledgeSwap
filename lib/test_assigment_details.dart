@@ -49,7 +49,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     });
 
     try {
-      final url = Uri.parse('http://$_serverIP/get_assignment_users.php?assignment_id=${widget.assignment['id']}');
+      final url = Uri.parse('$_serverIP/get_assignment_users.php?assignment_id=${widget.assignment['id']}');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -77,7 +77,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     });
 
     try {
-      final url = Uri.parse('http://$_serverIP/add_users_to_assignment.php');
+      final url = Uri.parse('$_serverIP/add_users_to_assignment.php');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -183,7 +183,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
 
     if (confirmed == true) {
       try {
-        final url = Uri.parse('http://$_serverIP/delete_test_assignment.php');
+        final url = Uri.parse('$_serverIP/delete_test_assignment.php');
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -320,7 +320,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
             ? NetworkImage(
                 user['profile_picture'].startsWith('http')
                     ? user['profile_picture']
-                    : 'http://$_serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
+                    : '$_serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
               )
             : null,
         child: user['profile_picture'] == null 
@@ -486,7 +486,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
 
     try {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
-      final fullUrl = 'http://$_serverIP/$cleanPath';
+      final fullUrl = '$_serverIP/$cleanPath';
       
       if (kIsWeb) {
         html.window.open(fullUrl, '_blank');
@@ -529,7 +529,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       );
     }
 
-    final proxyUrl = 'http://$_serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
+    final proxyUrl = '$_serverIP/image_proxy.php?path=${Uri.encodeComponent(path)}';
 
     if (path.toLowerCase().endsWith('.pdf')) {
       return const Column(

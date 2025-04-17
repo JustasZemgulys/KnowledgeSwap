@@ -1,21 +1,13 @@
 <?php
-// delete_icon.php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
+require_once 'db_connect.php';
 
-error_reporting(0); // Turn off error reporting in production
+$conn = getDBConnection();
+
+//error_reporting(0);
 
 $response = ['success' => false, 'message' => 'Request failed'];
 
 try {
-    // Database connection
-    $conn = new mysqli("localhost", "root", "", "knowledgeswap");
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
-
     // Get input data
     $input = json_decode(file_get_contents('php://input'), true);
     $resourceId = isset($input['resource_id']) ? (int)$input['resource_id'] : 0;
