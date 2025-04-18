@@ -29,9 +29,9 @@
             'dev_requirement' => false,
         ),
         'smalot/pdfparser' => array(
-            'pretty_version' => 'v2.11.0',
-            'version' => '2.11.0.0',
-            'reference' => 'ac8e6678b0940e4b2ccd5caadd3fb18e68093be6',
+            'pretty_version' => 'v2.12.0',
+            'version' => '2.12.0.0',
+            'reference' => '8440edbf58c8596074e78ada38dcb0bd041a5948',
             'type' => 'library',
             'install_path' => __DIR__ . '/../smalot/pdfparser',
             'aliases' => array(),

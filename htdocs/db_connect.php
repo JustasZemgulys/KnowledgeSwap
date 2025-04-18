@@ -9,10 +9,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit();
 }
 
-define('DB_SERVER', 'localhost');
-define('DB_USERNAME', 'root');
-define('DB_PASSWORD', '');
-define('DB_NAME', 'knowledgeswap');
+define('DB_SERVER', 'stud-db1');
+define('DB_USERNAME', 'juszem1');
+define('DB_PASSWORD', 'Eeng9aoR4thaiwi3');
+define('DB_NAME', 'juszem1');
 
 function getDBConnection() {
     $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);

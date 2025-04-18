@@ -7,19 +7,25 @@ require_once 'db_connect.php';
 
 $conn = getDBConnection();
 
-require 'vendor/autoload.php'; // Ensure Composer autoload is included
+function log_message($message) {
+    $timestamp = date('Y-m-d H:i:s');
+    $logEntry = "[$timestamp] $message\n";
+    file_put_contents(__DIR__ . '/ai_create_debug.log', $logEntry, FILE_APPEND);
+}
 
-$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ"; // Your Mistral API key
+require 'vendor/autoload.php';
+
+$apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
 
 // Get fields from POST data
 $topic = $_POST['topic'] ?? '';
 $parameters = $_POST['parameters'] ?? '';
 
-error_log("Received topic: $topic, parameters: $parameters");
+log_message("Received topic: $topic, parameters: $parameters");
 
 // Validate required fields
 if (empty($topic) || empty($parameters)) {
-    error_log("Validation failed: Missing topic or parameters");
+    log_message("Validation failed: Missing topic or parameters");
     echo json_encode(["error" => "Missing or invalid required fields"]);
     exit;
 }
@@ -27,7 +33,7 @@ if (empty($topic) || empty($parameters)) {
 // Handle file upload
 $extractedText = "";
 if (isset($_FILES['file'])) {
-    error_log("File uploaded: " . print_r($_FILES['file'], true));
+    log_message("File uploaded: " . print_r($_FILES['file'], true));
     $file = $_FILES['file'];
     $filePath = $file['tmp_name'];
     $fileType = $file['type'];
@@ -35,14 +41,14 @@ if (isset($_FILES['file'])) {
     // Extract text from the uploaded file
     $extractionResult = extractTextFromFile($filePath, $fileType);
     if (is_array($extractionResult) && isset($extractionResult['error'])) {
-        error_log("Text extraction failed: " . print_r($extractionResult, true));
+        log_message("Text extraction failed: " . print_r($extractionResult, true));
         echo json_encode($extractionResult);
         exit;
     }
     $extractedText = $extractionResult;
 
     if (empty($extractedText)) {
-        error_log("Text extraction returned empty text");
+        log_message("Text extraction returned empty text");
         echo json_encode(["error" => "Failed to extract text from file"]);
         exit;
     }
@@ -91,7 +97,7 @@ try {
         "temperature" => 0.7
     ];
 
-    error_log("Sending request to Mistral API with prompt: $prompt");
+    log_message("Sending request to Mistral API with prompt: $prompt");
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -108,8 +114,8 @@ try {
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    error_log("API Response Code: $httpCode");
-    error_log("API Response: $response");
+    log_message("API Response Code: $httpCode");
+    log_message("API Response: $response");
 
     if (curl_errno($ch)) {
         throw new Exception("CURL error: " . curl_error($ch));
@@ -131,7 +137,7 @@ try {
         throw new Exception("Unexpected response format");
     }
 } catch (Exception $e) {
-    error_log("API Error: " . $e->getMessage());
+    log_message("API Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "error" => "Failed to generate questions",
@@ -142,73 +148,188 @@ try {
 }
 
 /**
- * Extracts text from a file (PDF or image).
+ * Extracts text from PDF files with server-side parsing and timeout protection
+ */
+function extractTextFromPDF($filePath) {
+    try {
+        log_message("Starting PDF processing for: " . basename($filePath));
+
+        // Initialize the parser FIRST
+        $parser = new \Smalot\PdfParser\Parser();
+        log_message("PDF parser initialized");
+
+        // Parse the PDF
+        log_message("Attempting to parse PDF file");
+        $pdf = $parser->parseFile($filePath);
+        log_message("PDF parsed successfully");
+        
+        $text = $pdf->getText();
+        log_message("Text extracted from PDF");
+        
+        if (empty(trim($text))) {
+            throw new Exception("No text content found - possibly image-based PDF");
+        }
+        
+        return $text;
+        
+    } catch (\Exception $e) {
+        log_message("PDF Error: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Main file text extraction handler with timeout protection
  */
 function extractTextFromFile($filePath, $fileType) {
-    $extractedText = "";
-
-    // Use finfo to detect the MIME type
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $detectedMimeType = finfo_file($finfo, $filePath);
-    finfo_close($finfo);
-
-    // Override the provided $fileType with the detected MIME type
-    $fileType = $detectedMimeType;
-
-    error_log("Detected MIME type: $fileType");
-
+    // Set overall timeout (45 seconds)
+    set_time_limit(45);
+    $startTime = time();
+    
     try {
-        // Verify file exists
-        if (!file_exists($filePath)) {
-            throw new Exception("File not found: $filePath");
+        log_message("Starting file processing for: " . basename($filePath));
+
+        if (!is_readable($filePath)) {
+            throw new Exception("File not found or not readable");
         }
 
-        // PDF handling
-        if ($fileType === 'application/pdf') {
-            error_log("Parsing PDF file: $filePath");
-            $parser = new \Smalot\PdfParser\Parser();
-            $pdf = $parser->parseFile($filePath);
-            $extractedText = $pdf->getText();
+        // Verify MIME type
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $detectedMimeType = finfo_file($finfo, $filePath);
+        finfo_close($finfo);
+        
+        log_message("Detected MIME type: $detectedMimeType");
 
-            if (empty($extractedText)) {
-                throw new Exception("PDF parsing returned empty text. The PDF might be image-based or contain no extractable text.");
-            }
-
-            error_log("PDF text extracted successfully");
+        // Handle different file types
+        switch ($detectedMimeType) {
+            case 'application/pdf':
+                try {
+                    $text = extractTextFromPDF($filePath);
+                    log_message("PDF processing completed in " . (time() - $startTime) . " seconds");
+                    return $text;
+                } catch (Exception $e) {
+                    return [
+                        "error" => "PDF processing failed",
+                        "details" => $e->getMessage(),
+                        "solution" => "Please upload a smaller, non-secured, text-based PDF"
+                    ];
+                }
+                
+            case 'image/jpeg':
+            case 'image/png':
+            case 'image/jpg':
+                if ((time() - $startTime) > 30) {
+                    throw new Exception("Processing taking too long");
+                }
+                return ocrWithCloudService($filePath, $detectedMimeType);
+                
+            default:
+                throw new Exception("Unsupported file type: $detectedMimeType");
         }
-        // Image handling
-        elseif (in_array($fileType, ['image/jpeg', 'image/png', 'image/jpg'])) {
-            error_log("Processing image file: $filePath");
-            $outputFile = tempnam(sys_get_temp_dir(), 'ocr_output');
-
-            // Use full path to Tesseract
-            $tesseractPath = '"C:\\Program Files\\Tesseract-OCR\\tesseract"'; // Windows
-            // $tesseractPath = '/usr/bin/tesseract'; // Linux/macOS
-
-            $cmd = "$tesseractPath " . escapeshellarg($filePath) . " " . escapeshellarg($outputFile) . " 2>&1";
-            exec($cmd, $output, $returnCode);
-
-            if ($returnCode !== 0) {
-                throw new Exception("Tesseract failed (Code $returnCode): " . implode("\n", $output));
-            }
-
-            $extractedText = file_get_contents($outputFile . '.txt');
-            unlink($outputFile . '.txt');
-
-            if (empty($extractedText)) {
-                throw new Exception("OCR returned empty text");
-            }
-        }
-        else {
-            throw new Exception("Unsupported file type: $fileType");
-        }
+        
     } catch (Exception $e) {
-        error_log("Extraction Error: " . $e->getMessage());
+        log_message("Extraction Error after " . (time() - $startTime) . " seconds: " . $e->getMessage());
         return [
             "error" => "Text extraction failed",
-            "details" => $e->getMessage()
+            "details" => $e->getMessage(),
+            "processing_time" => (time() - $startTime) . " seconds"
         ];
     }
-
-    return $extractedText;
 }
+
+/**
+ * Uses OCR.space API for text extraction with proper error handling
+ */
+function ocrWithCloudService($filePath, $fileType) {
+    $apiKey = 'K82403247488957'; // Double-check this key at ocr.space
+    $url = 'https://api.ocr.space/parse/image';
+    
+    try {
+        // 1. Verify file exists and is readable
+        if (!is_readable($filePath)) {
+            log_message("File not readable: $filePath");
+        }
+
+        // 2. Prepare file content with error handling
+        $fileContent = file_get_contents($filePath);
+        if ($fileContent === false) {
+            log_message("Failed to read file contents");
+        }
+        
+        // 3. Debug file info
+        $fileInfo = [
+            'size' => filesize($filePath),
+            'mime' => mime_content_type($filePath),
+            'base64_length' => strlen(base64_encode($fileContent))
+        ];
+        log_message("File debug: " . print_r($fileInfo, true));
+
+        // 4. Use cURL instead of file_get_contents
+        $ch = curl_init();
+        
+        $data = [
+            'apikey' => $apiKey,
+            'language' => 'eng',
+            'isOverlayRequired' => 'false',
+            'base64Image' => 'data:' . $fileType . ';base64,' . base64_encode($fileContent),
+            'OCREngine' => 2,
+            'filetype' => strtoupper(pathinfo($filePath, PATHINFO_EXTENSION))
+        ];
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => ['Expect:'], // Fix for some servers
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false // Temporary for debugging
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        // 5. Enhanced error logging
+        if (curl_errno($ch)) {
+            $curlError = curl_error($ch);
+            log_message("cURL Error: $curlError");
+            throw new Exception("API connection failed: $curlError");
+        }
+        
+        if ($httpCode !== 200) {
+            log_message("API returned HTTP $httpCode. Response: $response");
+            throw new Exception("API returned HTTP $httpCode");
+        }
+
+        $result = json_decode($response, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            log_message("Invalid JSON: $response");
+            throw new Exception("Invalid API response format");
+        }
+
+        // 6. Parse response with debug
+        log_message("Full API response: " . print_r($result, true));
+        
+        if (!isset($result['ParsedResults'][0]['ParsedText'])) {
+            $error = $result['ErrorMessage'] ?? 'No parsed text in response';
+            log_message("OCR failed: $error");
+        }
+
+        $text = trim($result['ParsedResults'][0]['ParsedText']);
+        
+        if (empty($text)) {
+            log_message("OCR returned empty text");
+        }
+
+        return $text;
+    } catch (Exception $e) {
+        log_message("OCR Failed: " . $e->getMessage());
+        throw new Exception("OCR processing error: " . $e->getMessage());
+    } finally {
+        if (isset($ch)) curl_close($ch);
+    }
+}
+
+
+?>

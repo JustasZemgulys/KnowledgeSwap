@@ -6,6 +6,12 @@ header('Content-Type: application/json');
 
 $conn = getDBConnection();
 
+function log_message($message) {
+    $timestamp = date('Y-m-d H:i:s');
+    $logEntry = "[$timestamp] $message\n";
+    file_put_contents(__DIR__ . '/save_test_debug.log', $logEntry, FILE_APPEND);
+}
+
 // Get raw POST data
 $json = file_get_contents('php://input');
 $data = json_decode($json, true);
@@ -31,7 +37,6 @@ try {
     // Start transaction
     $conn->begin_transaction();
 
-    // Prepare resource ID - handle NULL case properly
     $resourceId = !empty($data['fk_resource']) ? (int)$data['fk_resource'] : null;
     $visibility = isset($data['visibility']) ? (int)$data['visibility'] : 1;
     
@@ -40,21 +45,12 @@ try {
         (name, description, creation_date, visibility, fk_user, fk_resource) 
         VALUES (?, ?, NOW(), ?, ?, ?)");
     
-    if ($resourceId === null) {
-        $stmt->bind_param("ssiii", 
-            $data['name'], 
-            $data['description'], 
-            $visibility,
-            $data['userId'],
-            $resourceId);
-    } else {
-        $stmt->bind_param("ssiii", 
-            $data['name'], 
-            $data['description'], 
-            $visibility,
-            $data['userId'],
-            $resourceId);
-    }
+	$stmt->bind_param("ssiii", 
+		$data['name'], 
+		$data['description'], 
+		$visibility,
+		$data['userId'],
+		$resourceId);
     
     if (!$stmt->execute()) {
         throw new Exception("Test insert failed: " . $conn->error);

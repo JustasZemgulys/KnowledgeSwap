@@ -146,7 +146,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           retry = true; // Retry if response is null
         }
       } catch (e) {
-        //print('Error: $e');
+        print('Error: $e');
         retry = true; // Retry if an exception occurs
       }
 
@@ -476,7 +476,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           };
         }).toList(),
         'userId': userInfo.id,
-        if (_selectedResourceId != null) 'fk_resource': _selectedResourceId,
+        'fk_resource': _selectedResourceId,
         'visibility': _visibility,
       };
 
@@ -487,7 +487,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       final userIP = await getUserIP();
       final url = widget.initialTestData != null 
           ? '$userIP/update_test.php'
-          : '$userIP/save_test.php';
+          : '$userIP/create_test.php';
 
       final response = await http.post(
         Uri.parse(url),
