@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/models/user_info.dart';
 import 'package:knowledgeswap/resource_test_generator.dart';
+import 'package:knowledgeswap/user_info_provider.dart';
+import 'package:provider/provider.dart';
 
 class ResourceTestConfigScreen extends StatefulWidget {
   final int resourceId;
@@ -19,21 +22,25 @@ class ResourceTestConfigScreen extends StatefulWidget {
 
 class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   final List<Map<String, TextEditingController>> _questions = [];
+  final TextEditingController _replaceTopicsController = TextEditingController();
   bool _isGenerating = false;
   final int _maxQuestions = 20;
+  late UserInfo userInfo;
 
   @override
   void initState() {
     super.initState();
+    userInfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     _initializeDefaultQuestions();
   }
 
   void _initializeDefaultQuestions() {
     _questions.clear();
-    // Add 5 default questions
+
+    // Add 5 default questions with resource name as topic
     for (var i = 0; i < 5; i++) {
       _addQuestion(
-        topic: 'Grammar',
+        topic: widget.resourceName,
         parameters: _getDefaultParameters(i),
       );
     }
@@ -60,7 +67,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
 
     setState(() {
       _questions.add({
-        'topic': TextEditingController(text: topic),
+        'topic': TextEditingController(text: topic.isNotEmpty ? topic : widget.resourceName),
         'parameters': TextEditingController(text: parameters),
       });
     });
@@ -89,6 +96,22 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
       _questions[index]['parameters']!.dispose();
       _questions.removeAt(index);
     });
+  }
+
+  void _replaceAllTopics() {
+    if (_replaceTopicsController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter text to replace topics')),
+      );
+      return;
+    }
+
+    setState(() {
+      for (var question in _questions) {
+        question['topic']!.text = _replaceTopicsController.text;
+      }
+    });
+    _replaceTopicsController.clear();
   }
 
   Future<void> _generateTest() async {
@@ -136,6 +159,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
       question['topic']!.dispose();
       question['parameters']!.dispose();
     }
+    _replaceTopicsController.dispose();
     super.dispose();
   }
 
@@ -143,16 +167,43 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Generate Test for ${widget.resourceName}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Generate Test for ${widget.resourceName}',
+          style: const TextStyle(color: Colors.deepPurple),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Questions: ${_questions.length}/$_maxQuestions',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _replaceTopicsController,
+                    decoration: InputDecoration(
+                      labelText: 'Replace all topics with',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: _replaceAllTopics,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${_questions.length}/$_maxQuestions',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ..._questions.asMap().entries.map((entry) {
@@ -181,10 +232,10 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
                       ),
                       TextField(
                         controller: question['topic'],
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Topic',
-                          hintText: 'e.g. Grammar, Vocabulary',
-                          border: OutlineInputBorder(),
+                          hintText: 'e.g. ${widget.resourceName}',
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -207,16 +258,25 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () => _addQuestion(
-                    topic: 'Grammar',
+                    topic: widget.resourceName,
                     parameters: 'multiple choice',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.deepPurple,
+                    side: const BorderSide(color: Colors.deepPurple),
                   ),
                   child: const Text('Add Question'),
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: _generateTest,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
                   child: _isGenerating
-                      ? const CircularProgressIndicator()
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Generate Test'),
                 ),
               ],

@@ -4,7 +4,6 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'db_connect.php';
-
 $conn = getDBConnection();
 
 function log_message($message) {
@@ -18,69 +17,132 @@ require 'vendor/autoload.php';
 $apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
 
 // Get fields from POST data
-$topic = $_POST['topic'] ?? '';
-$parameters = $_POST['parameters'] ?? '';
+$topic = trim($_POST['topic'] ?? '');
+$parameters = trim($_POST['parameters'] ?? '');
+$useResourceText = isset($_POST['use_resource']) && $_POST['use_resource'] == '1';
 
-log_message("Received topic: $topic, parameters: $parameters");
+log_message("Received topic: $topic, parameters: $parameters, useResource: $useResourceText");
 
 // Validate required fields
-if (empty($topic) || empty($parameters)) {
-    log_message("Validation failed: Missing topic or parameters");
-    echo json_encode(["error" => "Missing or invalid required fields"]);
+if (empty($topic)) {
+    echo "Missing Topic";
     exit;
 }
 
-// Handle file upload
+// Handle file upload and text extraction if resource should be used
 $extractedText = "";
-if (isset($_FILES['file'])) {
-    log_message("File uploaded: " . print_r($_FILES['file'], true));
+if ($useResourceText && isset($_FILES['file'])) {
+    log_message("Processing attached resource for text extraction");
     $file = $_FILES['file'];
     $filePath = $file['tmp_name'];
     $fileType = $file['type'];
 
-    // Extract text from the uploaded file
     $extractionResult = extractTextFromFile($filePath, $fileType);
-    if (is_array($extractionResult) && isset($extractionResult['error'])) {
-        log_message("Text extraction failed: " . print_r($extractionResult, true));
-        echo json_encode($extractionResult);
+    if (is_array($extractionResult)) {
+        echo "Failed to extract text from resource";
         exit;
     }
-    $extractedText = $extractionResult;
+    $extractedText = trim($extractionResult);
 
     if (empty($extractedText)) {
-        log_message("Text extraction returned empty text");
-        echo json_encode(["error" => "Failed to extract text from file"]);
+        echo "Resource text extraction returned empty content";
         exit;
     }
 }
 
-// Construct the AI prompt
-$prompt = "Generate 1 question about $topic";
+// Construct the AI prompt with strict format requirements
+$prompt = <<<PROMPT
+Generate exactly 1 high-quality question about {$topic} that strictly follows these rules:
+
+# CORE REQUIREMENTS
+1. [TITLE] - Full question text
+   - Example: [TITLE]What is PHP's main advantage?[/TITLE]
+   - Must end with closing tag: [/TITLE]
+
+2. [DESCRIPTION] - Mandatory explanation of the question.
+   - It should explain what the question is about.
+   - It should explain how it relates to the resource content.
+   - Format: [DESCRIPTION]This question examines the main reason for PHP's popularity as a server-side language. The answer will be taken directly from the section discussing PHP's advantages in the resource text.[/DESCRIPTION]
+   - Must end with closing tag: [/DESCRIPTION]
+   
+3. QUESTION TYPES:
+   - If creating MULTIPLE-CHOICE:
+     a) Include 2-4 [OPTION] tags
+	 b) Each option MUST end with [/OPTION]
+     c) [ANSWER] must exactly match one option (e.g., "A) Correct choice")
+	 - Example:
+   [OPTION]A) Easy deployment[/OPTION]
+   [OPTION]B) Strong typing[/OPTION]
+   - If creating OPEN-ENDED:
+     * [ANSWER] must be self-contained and complete
+     * [DESCRIPTION] field is not required, can be totally left empty.
+   
+4. [ANSWER] - Complete answer with:
+   a) The correct response
+   b) Context paragraph from resource (when available)
+   - Format: [ANSWER]Correct answer\n[/ANSWER]\n[CONTEXT]Relevant excerpt[...][/CONTEXT]
+   - Must end with closing tag: [/ANSWER]
+
+PROMPT;
+// Add parameters if provided
 if (!empty($parameters)) {
-    $prompt .= " based on the following parameters: $parameters";
+    $prompt .= "\n\n# MANDATORY PARAMETERS\nThis question MUST satisfy ALL of these requirements:\n{$parameters}";
 }
-$prompt .= ".";
+// Add resource-specific instructions if applicable
 if (!empty($extractedText)) {
-    $prompt .= " Use the following text as a reference: $extractedText";
+    $prompt .= <<<RESOURCE
+
+# STRICT TOPIC-RESOURCE VALIDATION:
+- FIRST verify the resource text is actually about {$topic}
+- If the resource contains NO relevant information about {$topic}, return:
+  [FAILURE]Failed to create question: The resource does not contain any information about {$topic}[/FAILURE]
+- Only proceed with question generation if the resource clearly relates to {$topic}
+
+# REFERENCE TEXT TO USE:
+{$extractedText}
+RESOURCE;
+} else {
+    $prompt .= "\n\n# GENERAL KNOWLEDGE QUESTION RULES:\n- Draw from established facts about {$topic}\n- Provide clear, concise answers. Do not include CONTEXT section for this question it does not need it";
 }
 
-// Add format instructions
-$prompt .= " Follow this exact format:
+// Final formatting requirements
+$prompt .= <<<FORMAT
 
-Question: [The question text]
+# STRICT FORMATTING RULES:
+1. QUESTION TYPES:
+   - If creating MULTIPLE-CHOICE:
+     a) Include 2-4 [OPTION] tags
+	 b) Each option MUST end with [/OPTION]
+     c) [ANSWER] must exactly match one option (e.g., "A) Correct choice")
+	 - Example:
+   [OPTION]A) Easy deployment[/OPTION]
+   [OPTION]B) Strong typing[/OPTION]
+   - If creating OPEN-ENDED:
+     * [ANSWER] must be self-contained and complete
+     * [DESCRIPTION] field is not required, can be totally left empty.
 
-**If and ONLY if the question type is multiple choice or true or false **, include:
-Options:
-A) [Option A]
-B) [Option B]
-**Use 2 options, for true or false questions, more for multiple choice questions, eg**
-C) [Option C]
-D) [Option D]
-Answer: [The correct answer. If the question is multiple choice, format the answer as 'A) [Option A]'. Otherwise, provide a direct answer as 'Answer'.]
-**Important Rules:**
-- Do NOT include the Options section for open-ended, fill-in-the-blank, or other non-multiple-choice questions.
-- Never include example options (e.g., commented-out options) for non-multiple-choice questions
-";
+2. FAILURE CASES:
+	- If impossible to create valid question, return:
+		[FAILURE]Reason why[/FAILURE]
+	- If impossible to create question with that topic and resouce return:
+		[FAILURE]Failed create question with that topic and resouce[/FAILURE]
+
+# EXAMPLE (Resource-Based Multiple-Choice):
+[TITLE]How does PHP handle type conversion?[/TITLE]
+[DESCRIPTION]PHP automatically converts between types in most contexts. This differs from strict-typed languages where explicit conversion is needed. The correct answer shows this automatic behavior, while incorrect options describe manual conversion or type errors.[/DESCRIPTION]
+[OPTION]A) Requires explicit casting[/OPTION]
+[OPTION]B) Automatically converts types[/OPTION]
+[OPTION]C) Always throws type errors[/OPTION]
+[OPTION]D) Only converts strings to numbers[/OPTION]
+[ANSWER]B) Automatically converts types[/ANSWER]
+[CONTEXT]"PHP automatically converts types based on context - strings become numbers in arithmetic operations [...]"[/CONTEXT]
+
+# EXAMPLE (General Knowledge Open-Ended):
+[TITLE]What year was PHP created?[/TITLE]
+[DESCRIPTION]Tests knowledge of PHP's history and development timeline. PHP was created before many modern web technologies and pioneered server-side scripting for the web.[/DESCRIPTION]
+[ANSWER]1995[/ANSWER]
+FORMAT;
+
 
 try {
     // Mistral API configuration
@@ -93,7 +155,7 @@ try {
                 "content" => $prompt
             ]
         ],
-        "max_tokens" => 500,
+        "max_tokens" => 1000,
         "temperature" => 0.7
     ];
 
@@ -108,7 +170,7 @@ try {
         ],
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => json_encode($inputData),
-        CURLOPT_TIMEOUT => 30
+        CURLOPT_TIMEOUT => 45
     ]);
 
     $response = curl_exec($ch);
@@ -127,22 +189,106 @@ try {
         throw new Exception("API error: " . ($responseData['message'] ?? 'Unknown error'));
     }
 
-    // Extract the correct response content
-    if (isset($responseData['choices'][0]['message']['content'])) {
-        echo json_encode([
-            "success" => true,
-            "full_response" => $responseData
-        ]);
-    } else {
-        throw new Exception("Unexpected response format");
-    }
+    // Extract the response content
+	$aiResponse = $responseData['choices'][0]['message']['content'] ?? '';
+	log_message("AI Response Content: $aiResponse");
+
+	// In the validation section, replace with this version:
+
+	// Extract and normalize the response
+	$aiResponse = $responseData['choices'][0]['message']['content'] ?? '';
+	$aiResponse = preg_replace('/\r\n|\r/', "\n", trim($aiResponse));
+
+	// Check for failure case first
+	if (preg_match('/\[FAILURE\](.*?)\[\/FAILURE\]/s', $aiResponse, $failureMatches)) {
+		echo json_encode([
+			'success' => false,
+			'error' => trim($failureMatches[1]),
+			'content' => $aiResponse
+		]);
+		exit;
+	}
+
+	// Parse all components with more flexible matching
+	$components = [
+		'title' => null,
+		'description' => null,
+		'answer' => null,
+		'context' => null,
+		'options' => []
+	];
+
+	// Use a more robust parsing approach
+	$sections = [
+		'title' => '/\[TITLE\](.*?)\[\/TITLE\]/s',
+		'description' => '/\[DESCRIPTION\](.*?)\[\/DESCRIPTION\]/s',
+		'answer' => '/\[ANSWER\](.*?)(?:\[\/ANSWER\]|$)/s',
+		'context' => '/\[CONTEXT\](.*?)\[\/CONTEXT\]/s',
+		'options' => '/\[OPTION\](.*?)\[\/OPTION\]/s'
+	];
+
+	foreach ($sections as $key => $pattern) {
+		if ($key === 'options') {
+			if (preg_match_all($pattern, $aiResponse, $matches)) {
+				$components[$key] = array_map('trim', $matches[1]);
+			}
+		} else {
+			if (preg_match($pattern, $aiResponse, $matches)) {
+				$components[$key] = trim($matches[1]);
+			}
+		}
+	}
+
+	// Debug log the parsed components
+	log_message("Parsed components: " . print_r($components, true));
+
+	// Validate required fields
+	if (empty($components['title']) || empty($components['answer']) || empty($components['description'])) {
+		$missing = [];
+		empty($components['title']) && $missing[] = "TITLE";
+		empty($components['answer']) && $missing[] = "ANSWER";
+		empty($components['description']) && $missing[] = "DESCRIPTION";
+		
+		echo "AI failed to provide required components: " . implode(", ", $missing);
+		exit;
+	}
+
+
+	// For resource-based questions, ensure context exists
+	if (!empty($extractedText) && empty($components['context'])) {
+		echo "Resource-based questions require [CONTEXT] with supporting text";
+		exit;
+	}
+
+	// Build the description with options if they exist
+	$description = $components['description'] ?? '';
+	if (!empty($components['options'])) {
+		$description .= (empty($description) ? "" : "\n\n") . "Options:\n";
+		foreach ($components['options'] as $option) {
+			$description .= "• " . trim($option) . "\n";
+		}
+	}
+
+	// Build the answer with context if it exists
+	$answer = $components['answer'];
+	if (!empty($components['context'])) {
+		$answer .= "\n\nContext:\n" . $components['context'];
+	}
+
+	// Debug log the final output
+	log_message("Final description: " . $description);
+	log_message("Final answer: " . $answer);
+
+	// Return the combined fields
+	$formattedResponse = "[TITLE]{$components['title']}[/TITLE]\n" .
+						 "[DESCRIPTION]{$description}[/DESCRIPTION]\n" .
+						 "[ANSWER]{$answer}[/ANSWER]";
+
+	echo $formattedResponse;
+	
 } catch (Exception $e) {
     log_message("API Error: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        "error" => "Failed to generate questions",
-        "details" => $e->getMessage()
-    ]);
+    echo "Processing error: {$e->getMessage()}";
 } finally {
     if (isset($ch)) curl_close($ch);
 }
@@ -330,6 +476,4 @@ function ocrWithCloudService($filePath, $fileType) {
         if (isset($ch)) curl_close($ch);
     }
 }
-
-
 ?>

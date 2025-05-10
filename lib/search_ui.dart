@@ -137,10 +137,12 @@ class _SearchScreenState extends State<SearchScreen> {
     final isOwner = item['fk_user'] == user_info.id;
     final isTest = item['type'] == 'test';
     final isGroup = item['type'] == 'group';
+    final isForumItem = item['type'] == 'forum_item';
     final itemId = item['id'];
     final isPrivate = item['visibility'] == 0;
     final score = item['score'] ?? 0;
     final userVote = item['user_vote']; // 1 for upvote, -1 for downvote, null for no vote
+    if(isForumItem) item['name'] = item['title'];
 
     return Card(
       margin: const EdgeInsets.all(8.0),
@@ -212,10 +214,12 @@ class _SearchScreenState extends State<SearchScreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')} • Created: ${item['creation_date']}'),
+                  Text('${isGroup ? 'Group' : (isTest ? 'Test' : (isForumItem ? 'Forum Post' : 'Resource'))} '),
+
                   Text('By: ${item['creator_name'] ?? 'Unknown'}'),
                   if (isPrivate) Text('Private', style: TextStyle(color: Colors.grey)),
                   if (isGroup) Text('${item['member_count'] ?? 0} members', style: TextStyle(color: Colors.grey)),
+                  //if (isForumItem && item['description'] != null) Text(item['description']),
                 ],
               ),
               trailing: PopupMenuButton<String>(
@@ -492,18 +496,16 @@ class _SearchScreenState extends State<SearchScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/main'),
+          
         ),
         title: Text(
           "Search",
           style: TextStyle(color: Colors.deepPurple),
         ),
-        
+        backgroundColor: Colors.white,
+        scrolledUnderElevation: 0, 
+        iconTheme: IconThemeData(color: Colors.deepPurple),
         actions: [
-          //IconButton(
-          //  icon: const Icon(Icons.search),
-          //  onPressed: _performSearch,
-          //),
-          //const SizedBox(width: 8),
           IconButton(
             icon: Image.asset("assets/usericon.jpg"),
             onPressed: () {
@@ -553,6 +555,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     DropdownMenuItem(value: 'resource', child: Text('Resources')),
                     DropdownMenuItem(value: 'test', child: Text('Tests')),
                     DropdownMenuItem(value: 'group', child: Text('Groups')),
+                    DropdownMenuItem(value: 'forum_item', child: Text('Forum posts')),
                   ],
                   onChanged: (value) {
                     setState(() => resourceType = value!);

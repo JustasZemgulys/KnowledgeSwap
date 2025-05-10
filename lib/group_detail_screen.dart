@@ -660,7 +660,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Widget _buildTestCard(Map<String, dynamic> test) {
     final testName = test['name'] ?? 'Untitled Test';
-    //final questionCount = test['question_count'] ?? 0;
     final creatorName = test['creator_name'] ?? 'Unknown';
     final creationDate = test['creation_date'] ?? 0;
     final isOwner = test['fk_user'] == user_info.id;
@@ -675,7 +674,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TakeTestScreen(testId: test['id']),
+              builder: (context) => TakeTestScreen(
+                testId: test['id'],
+                groupId: widget.groupId, // Pass the group ID here
+              ),
             ),
           );
         },
@@ -1105,6 +1107,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             builder: (context) => TestAssignmentDetailScreen(
               assignment: assignment,
               groupId: widget.groupId,
+              userRole: groupDetails?['user_role'],
             ),
           ),
         );
@@ -1180,7 +1183,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Group Details'),
+        title: const Text(
+          'Group Details',
+          style: TextStyle(color: Colors.deepPurple),
+          ),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
+        backgroundColor: Colors.white,
         actions: [
           PopupMenuButton<String>(
             itemBuilder: (context) {

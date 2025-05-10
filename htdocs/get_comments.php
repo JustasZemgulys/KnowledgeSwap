@@ -11,7 +11,7 @@ try {
         throw new Exception("Invalid item ID");
     }
     
-    if (!isset($_GET['item_type']) || !in_array($_GET['item_type'], ['resource', 'test', 'group', 'answer'])) {
+    if (!isset($_GET['item_type']) || !in_array($_GET['item_type'], ['resource', 'test', 'group', 'answer', 'forum_item'])) {
         throw new Exception("Invalid item type");
     }
     

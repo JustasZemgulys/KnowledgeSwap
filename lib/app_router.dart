@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/create_group_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
+import 'package:knowledgeswap/forum_ui.dart';
 import 'package:knowledgeswap/group_ui.dart';
 import 'package:knowledgeswap/resource_ui.dart';
 import 'package:knowledgeswap/search_ui.dart';
@@ -60,6 +61,10 @@ class AppRouter {
       case '/create-group':
         _logRoute('Navigating to CreateGroupScreen');
         return MaterialPageRoute(builder: (_) => const CreateGroupScreen());
+      case '/forum':
+        _logRoute('Navigating to ForumScreen');
+        return MaterialPageRoute(builder: (_) => const ForumScreen());
+        
       default:
         _logError('No route defined for ${settings.name}');
         return MaterialPageRoute(

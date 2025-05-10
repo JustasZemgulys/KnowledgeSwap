@@ -332,11 +332,6 @@ class _TestScreenState extends State<TestScreen> {
                                         message: 'AI Generated Test',
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue,
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: Colors.blue, width: 1),
-                                          ),
                                           child: const Text(
                                             'AI',
                                             style: TextStyle(

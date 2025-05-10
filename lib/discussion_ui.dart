@@ -116,7 +116,7 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
       }
 
       final response = await http.post(
-        Uri.parse('$serverIP/post_comment.php'),
+        Uri.parse('$serverIP/create_comment.php'),
         body: body,
       );
 

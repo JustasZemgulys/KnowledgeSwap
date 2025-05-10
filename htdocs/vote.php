@@ -6,24 +6,32 @@ $conn = getDBConnection();
 $response = ['success' => false, 'message' => ''];
 
 try {
+    // Get input data (works with both POST and JSON)
+    $input = file_get_contents('php://input');
+    if (strpos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) {
+        $data = json_decode($input, true);
+    } else {
+        parse_str($input, $data);
+    }
+
     // Validate input
     $requiredFields = ['direction', 'fk_user', 'fk_item', 'fk_type'];
     foreach ($requiredFields as $field) {
-        if (!isset($_POST[$field])) {
+        if (!isset($data[$field])) {
             throw new Exception("Missing required field: $field");
         }
     }
 
-    $direction = (int)$_POST['direction'];
-    $userId = (int)$_POST['fk_user'];
-    $itemId = (int)$_POST['fk_item'];
-    $itemType = $_POST['fk_type'];
+    $direction = (int)$data['direction'];
+    $userId = (int)$data['fk_user'];
+    $itemId = (int)$data['fk_item'];
+    $itemType = $data['fk_type'];
 
     if (!in_array($direction, [1, -1])) {
         throw new Exception("Invalid vote direction");
     }
 
-    if (!in_array($itemType, ['test', 'resource', 'comment', 'group'])) {
+    if (!in_array($itemType, ['test', 'resource', 'comment', 'group', 'forum_item'])) {
         throw new Exception("Invalid item type");
     }
 
@@ -76,39 +84,12 @@ try {
         }
 
         // Update the item's score
-        $tableName = $itemType;
+        $tableName = $itemType === 'forum_item' ? 'forum_item' : $itemType;
         $updateScoreQuery = "UPDATE `$tableName` SET score = score + ? WHERE id = ?";
         $stmt = $conn->prepare($updateScoreQuery);
         $stmt->bind_param("ii", $voteChange, $itemId);
         $stmt->execute();
         $stmt->close();
-
-        // Update user points if this is a test or resource
-        /*if (in_array($itemType, ['test', 'resource'])) {
-            $pointsChange = $voteChange * ($itemType === 'test' ? 2 : 1); // Tests give more points
-            
-            // First, get the owner's user ID
-            $ownerIdQuery = "SELECT fk_user FROM $tableName WHERE id = ?";
-            $stmt = $conn->prepare($ownerIdQuery);
-            $stmt->bind_param("i", $itemId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $ownerRow = $result->fetch_assoc();
-            $ownerId = $ownerRow['fk_user'];
-            $stmt->close();
-
-            // Then update the owner's points
-            $updateUserQuery = "UPDATE user SET 
-                               points = points + ?,
-                               points_in_24h = points_in_24h + ?,
-                               points_in_week = points_in_week + ?,
-                               points_in_month = points_in_month + ?
-                               WHERE id = ?";
-            $stmt = $conn->prepare($updateUserQuery);
-            $stmt->bind_param("iiiii", $pointsChange, $pointsChange, $pointsChange, $pointsChange, $ownerId);
-            $stmt->execute();
-            $stmt->close();
-        }*/
 
         // Get the new score
         $getScoreQuery = "SELECT score FROM `$tableName` WHERE id = ?";
@@ -142,6 +123,7 @@ try {
     ];
 }
 
+header('Content-Type: application/json');
 echo json_encode($response);
 exit;
 ?>

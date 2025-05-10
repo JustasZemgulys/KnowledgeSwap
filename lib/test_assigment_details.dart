@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:knowledgeswap/forum_details_screen.dart';
 import 'package:knowledgeswap/user_info_provider.dart';
 import 'package:provider/provider.dart';
 import "package:universal_html/html.dart" as html;
@@ -14,11 +15,13 @@ import 'create_test_assignment.dart';
 class TestAssignmentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> assignment;
   final int groupId;
+  final String? userRole;
 
   const TestAssignmentDetailScreen({
     super.key,
     required this.assignment,
     required this.groupId,
+    this.userRole,
   });
 
   @override
@@ -212,6 +215,38 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     }
   }
 
+  Future<void> _viewUserSubmission(Map<String, dynamic> user) async {
+    try {
+      // Get the specific submission for this assignment
+      final response = await http.get(
+        Uri.parse('$_serverIP/get_user_submission.php?assignment_id=${widget.assignment['id']}&user_id=${user['id']}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['forum_item_id'] != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ForumDetailsScreen(
+                forumItemId: data['forum_item_id'],
+                hasTest: true,
+              ),
+            ),
+          );
+        } else {
+          throw Exception(data['message'] ?? 'No submission found for this assignment');
+        }
+      } else {
+        throw Exception('Server returned status code ${response.statusCode}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error viewing submission: $e')),
+      );
+    }
+  }
+
   Widget _buildResourceCard(Map<String, dynamic> resource) {
     final previewPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
     final resourcePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
@@ -273,14 +308,18 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     return Card(
       margin: const EdgeInsets.all(8),
       child: InkWell(
-        onTap: _canTakeTest ? () {
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TakeTestScreen(testId: test['id']),
+              builder: (context) => TakeTestScreen(
+                testId: test['id'],
+                groupId: widget.groupId,
+                assignmentId: widget.assignment['id'],
+              ),
             ),
           );
-        } : null,
+        },
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -313,7 +352,148 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     );
   }
 
+  Future<void> _gradeUserTest(Map<String, dynamic> user) async {
+    final scoreController = TextEditingController(
+      text: user['score']?.toString() ?? '',
+    );
+    final commentController = TextEditingController(
+      text: user['comment'] ?? '',
+    );
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Grade Test'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: scoreController,
+                    decoration: const InputDecoration(
+                      labelText: 'Score',
+                      hintText: 'Enter score',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Comments',
+                      hintText: 'Enter feedback',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (scoreController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a score')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
+                child: const Text('Submit'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result == true) {
+      try {
+        final url = Uri.parse('$_serverIP/grade_test.php');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'assignment_id': widget.assignment['id'],
+            'user_id': user['id'],
+            'grader_id': Provider.of<UserInfoProvider>(context, listen: false).userInfo?.id,
+            'score': int.parse(scoreController.text),
+            'comment': commentController.text,
+          }),
+        );
+
+        final responseData = json.decode(response.body);
+        
+        if (responseData['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Test graded successfully')),
+          );
+          _fetchAssignedUsers();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(responseData['message'] ?? 'Failed to grade test')),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error grading test: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildUserTile(dynamic user) {
+    final currentUser = Provider.of<UserInfoProvider>(context).userInfo;
+    final isAdmin = widget.userRole == 'admin';
+    final isModerator = widget.userRole == 'moderator';
+    final isSelf = currentUser?.id == user['id'];
+    final canViewGrade = isAdmin || isModerator || isSelf;
+    final canGrade = (isAdmin || isModerator) && user['completed'] == true;
+    final isCompleted = user['completed'] == true;
+    final hasComment = user['comment'] != null && user['comment'].toString().trim().isNotEmpty;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: hasComment
+          ? ExpansionTile(
+              title: _buildUserTileContent(user, canViewGrade, isCompleted, canGrade, isAdmin, isModerator),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Comment:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        user['comment'],
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : _buildUserTileContent(user, canViewGrade, isCompleted, canGrade, isAdmin, isModerator),
+    );
+  }
+
+  Widget _buildUserTileContent(
+    dynamic user, 
+    bool canViewGrade, 
+    bool isCompleted, 
+    bool canGrade, 
+    bool isAdmin, 
+    bool isModerator,
+  ) {
     return ListTile(
       leading: CircleAvatar(
         backgroundImage: user['profile_picture'] != null 
@@ -331,10 +511,9 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(user['email'] ?? ''),
-          if (user['completed'] == true)
+          if (isCompleted)
             Text(
-              'Completed on ${user['completion_date']?.split(' ')[0] ?? 'unknown date'}',
+              'Completed on ${DateFormat('MMM dd, yyyy').format(DateTime.parse(user['completion_date']))}',
               style: const TextStyle(color: Colors.green),
             )
           else
@@ -342,13 +521,47 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
               'Not completed yet',
               style: TextStyle(color: Colors.grey),
             ),
-          if (user['score'] != null)
+          if (canViewGrade && user['score'] != null)
             Text('Score: ${user['score']}'),
         ],
       ),
-      trailing: IconButton(
-        icon: const Icon(Icons.remove_circle, color: Colors.red),
-        onPressed: () => _removeUserFromAssignment(user['id']),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canGrade)
+            IconButton(
+              icon: const Icon(Icons.grade, color: Colors.orange),
+              onPressed: () => _gradeUserTest(user),
+            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            itemBuilder: (context) => [
+              if (isAdmin || isModerator)
+                PopupMenuItem(
+                  value: 'remove',
+                  child: ListTile(
+                    leading: const Icon(Icons.remove_circle, color: Colors.red),
+                    title: const Text('Remove from Assignment'),
+                  ),
+                ),
+              if (isCompleted)
+                PopupMenuItem(
+                  value: 'discussion',
+                  child: ListTile(
+                    leading: const Icon(Icons.forum),
+                    title: const Text('Go to Discussion'),
+                  ),
+                ),
+            ],
+            onSelected: (value) {
+              if (value == 'remove') {
+                _removeUserFromAssignment(user['id']);
+              } else if (value == 'discussion') {
+                _viewUserSubmission(user);
+              }
+            },
+          ),
+        ],
       ),
     );
   }

@@ -337,8 +337,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isEditMode ? "Edit Group" : "Create a Group"),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text(
+          widget.isEditMode ? "Edit Group" : "Create a Group",
+          style: TextStyle(color: Colors.deepPurple),
+          ),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
         actions: [
           const SizedBox(width: 1),
           IconButton(
@@ -414,7 +417,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 onPressed: _isUploading ? null : _createOrUpdateGroup,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  backgroundColor: Colors.blue[700],
+                  //backgroundColor: Colors.blue[700],
                 ),
                 child: _isUploading
                     ? const SizedBox(

@@ -20,7 +20,8 @@ try {
             tau.assigned_date,
             tau.completed,
             tau.completion_date,
-            tau.score
+            tau.score,
+			tau.comment
         FROM test_assignment_user tau
         JOIN user u ON tau.fk_user = u.id
         WHERE tau.fk_assignment = ?
@@ -49,7 +50,8 @@ try {
             'assigned_date' => $row['assigned_date'],
             'completed' => (bool)$row['completed'],
             'completion_date' => $row['completion_date'],
-            'score' => $row['score'] !== null ? (int)$row['score'] : null
+            'score' => $row['score'] !== null ? (int)$row['score'] : null,
+			'comment' => $row['comment'],
         ];
     }
 

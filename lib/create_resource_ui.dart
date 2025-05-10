@@ -676,6 +676,11 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
                   ),
               ],
             ),
+            const SizedBox(height: 5),
+            const Text(
+              'Allowed file types: PDF, JPG, PNG',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
             const SizedBox(height: 20),
             if (_selectedFile != null)
               Column(
@@ -699,6 +704,11 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
               icon: const Icon(Icons.image),
               label: const Text('Select Icon'),
               onPressed: _pickIcon,
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Allowed file types: JPG, PNG',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 10),
             _buildIconPreview(),

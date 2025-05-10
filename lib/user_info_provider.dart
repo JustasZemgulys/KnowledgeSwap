@@ -21,23 +21,23 @@ class UserInfoProvider with ChangeNotifier {
   Future<void> clearUserInfo() async {
     _userInfo = null;
     await WebStorage.clearUser();
+    await WebStorage.clearLastRoute();
     notifyListeners();
   }
 
   Future<bool> tryAutoLogin() async {
     try {
+      if (_userInfo != null) return true;
+      
       final userData = await WebStorage.getUser();
-      if (userData != null) {
+      if (userData != null && userData['id'] != null) {
         _userInfo = UserInfo.fromJson(userData);
         notifyListeners();
-        
-        // Get the last visited route
-        //final lastRoute = await WebStorage.getLastRoute();
         return true;
       }
       return false;
     } catch (e) {
-      //print('Error during auto-login: $e');
+      debugPrint('Error during auto-login: $e');
       await WebStorage.clearUser();
       return false;
     }

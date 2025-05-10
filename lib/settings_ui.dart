@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:knowledgeswap/main.dart';
 import 'package:provider/provider.dart';
 import 'package:knowledgeswap/welcome.dart';
 import 'dart:convert';
@@ -135,13 +136,22 @@ class _SettingScreenState extends State<SettingScreen> {
     }
   }
 
-  void disconnectUser() {
-    // Clear user_info and navigate to WelcomeScreen
-    Provider.of<UserInfoProvider>(context, listen: false).clearUserInfo;
-    Navigator.pushReplacement(
-      context,
+  Future<void> disconnectUser() async {
+    // Clear user info and storage
+    await Provider.of<UserInfoProvider>(context, listen: false).clearUserInfo();
+    
+    // Clear navigation stack and go to welcome screen
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+      (route) => false,
     );
+    
+    // Force rebuild the entire app
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const KnowledgeSwapApp()),
+      );
+    }
   }
 
   void deleteAccount() async {

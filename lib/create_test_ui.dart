@@ -36,7 +36,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   bool _isResourceAttached = false;
   int _visibility = 1;
   String serverIP = '';
-  List<_QuestionFormData> _questionFormData = [];  // List to hold the question forms
+  List<_QuestionFormData> _questionFormData = [];
+  bool _showAICreationOptions = false; 
+  bool _useResourceForAI = false;
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -46,19 +49,26 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     _descriptionController.addListener(_updateDescriptionCharCount);
     _initializeServerIP();
 
-    // Load existing test data if editing
     if (widget.initialTestData != null) {
       _titleController.text = widget.initialTestData!['name'] ?? '';
       _descriptionController.text = widget.initialTestData!['description'] ?? '';
       if (widget.initialTestData!['visibility'] is bool) {
-      _visibility = widget.initialTestData!['visibility'] ? 1 : 0;
+        _visibility = widget.initialTestData!['visibility'] ? 1 : 0;
       } else {
         _visibility = widget.initialTestData!['visibility'] as int;
       }
       if (widget.initialTestData!['fk_resource'] != null) {
         _selectedResourceId = widget.initialTestData!['fk_resource'];
         _isResourceAttached = true;
-        _selectedResourcePath = widget.initialTestData!['resource_link'];
+        _showAICreationOptions = true;
+        _fetchResourceDetails(_selectedResourceId!).then((resource) {
+        if (mounted) {
+          setState(() {
+            _selectedResourcePath = resource['resource_link'];
+            });
+            _initializeSelectedFile();
+          }
+        });
       }
       _loadExistingQuestions();
     }
@@ -66,6 +76,20 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<void> _initializeServerIP() async {
     serverIP = await getUserIP();
+  }
+
+  Future<void> _initializeSelectedFile() async {
+    if (_selectedResourcePath == null) return;
+    try {
+      final file = await _getFileFromPath(_selectedResourcePath!);
+      if (file != null) {
+        setState(() {
+          _selectedFile = file;
+        });
+      }
+    } catch (e) {
+      //print('Error initializing selected file: $e');
+    }
   }
 
   Future<void> _loadExistingQuestions() async {
@@ -119,45 +143,90 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   }
 
   Future<void> _fetchQuestionsFromAI() async {
-    final String topic = _topicController.text;
-    final String parameters = _parametersController.text;
+    final String topic = _topicController.text.trim();
+    final String parameters = _parametersController.text.trim();
 
     if (topic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please enter a topic")),
+        const SnackBar(content: Text("Please enter a topic")),
       );
       return;
     }
 
-    String userIP = await getUserIP();
-    final String url = '$userIP/ai_create_question.php';
+    // Show loading snackbar
+    final loadingSnackBar = ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Generating question..."),
+          ],
+        ),
+        duration: Duration(minutes: 1),
+      ),
+    );
 
-    bool retry = false;
+    setState(() => isLoading = true);
 
-    for (int attempt = 0; attempt < 2; attempt++) {
-      try {
-        var responseData = await _sendRequest(url, topic, parameters);
+    try {
+      String userIP = await getUserIP();
+      final String url = '$userIP/ai_create_question.php';
 
-        if (responseData != null) {
-          bool success = _processResponse(responseData);
-          if (success) return; // Exit if successful
-          retry = true; // Retry if unsuccessful
-        } else {
-          retry = true; // Retry if response is null
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      
+      // Add text fields
+      request.fields['topic'] = topic;
+      request.fields['parameters'] = parameters;
+      request.fields['use_resource'] = _useResourceForAI ? '1' : '0';
+
+      // Add file if selected and useResource is true
+      if (_useResourceForAI && _selectedFile != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            _selectedFile!.bytes!,
+            filename: _selectedFile!.name,
+          ),
+        );
+      } else if (_useResourceForAI && _selectedResourcePath != null) {
+        PlatformFile? resourceFile = await _getFileFromPath(_selectedResourcePath!);
+        if (resourceFile != null) {
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              resourceFile.bytes!,
+              filename: resourceFile.name,
+            ),
+          );
         }
-      } catch (e) {
-        print('Error: $e');
-        retry = true; // Retry if an exception occurs
       }
 
-      if (!retry) break; // Exit the loop if no retry is needed
-    }
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
 
-    // Show an error message if all attempts fail
-    if (retry) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Something went wrong. Please try again.")),
-      );
+      // Dismiss loading snackbar
+      loadingSnackBar.close();
+
+      if (response.statusCode == 200) {
+        _processResponse(responseData);
+      } else {
+        throw Exception("Server returned status ${response.statusCode}");
+      }
+    } catch (e) {
+      // Dismiss loading snackbar on error
+      loadingSnackBar.close();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to generate questions: ${e.toString()}")),
+        );
+        print(e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -171,10 +240,19 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       );
 
       if (selectedResource != null && mounted) {
+        // Clear the old file
+        setState(() {
+          _selectedFile = null;
+        });
+        
+        // Get the new file from the resource path
+        final file = await _getFileFromPath(selectedResource['resource_link']);
+        
         setState(() {
           _selectedResourceId = selectedResource['id'];
           _selectedResourcePath = selectedResource['resource_link'];
           _isResourceAttached = true;
+          _selectedFile = file;
         });
       }
     } catch (e) {
@@ -208,10 +286,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   void _removeAttachedResource() {
     setState(() {
       _selectedResourceId = null;
-      //_selectedResourceName = null;
       _selectedResourcePath = null;
+      _selectedFile = null;
       _isResourceAttached = false;
-      //_resourceDetailsFuture = null; // Clear the cached future
+      _useResourceForAI = false;
     });
   }
 
@@ -234,7 +312,7 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         Uri.parse(fullUrl),
         headers: {
           'Accept': 'application/octet-stream',
-          'Origin': '$serverIP', // Match your server's CORS policy
+          'Origin': serverIP,
         },
       );
 
@@ -251,111 +329,60 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           size: response.bodyBytes.length,
         );
       } else {
-        print('Server returned status code ${response.statusCode}');
+        //print('Server returned status code ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching file: $e');
+      //print('Error fetching file: $e');
       return null;
     }
   }
 
-  Future<Map<String, dynamic>?> _sendRequest(String url, String topic, String parameters) async {
+  bool _processResponse(String content) {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(url));
+      // Parse the bracket-formatted response
+      final titleRegExp = RegExp(r'\[TITLE\](.*?)\[\/TITLE\]', caseSensitive: false);
+      final descriptionRegExp = RegExp(r'\[DESCRIPTION\](.*?)\[\/DESCRIPTION\]', caseSensitive: false, dotAll: true);
+      final answerRegExp = RegExp(r'\[ANSWER\](.*?)\[\/ANSWER\]', caseSensitive: false, dotAll: true);
+      
+      // Extract components
+      final titleMatch = titleRegExp.firstMatch(content);
+      final descriptionMatch = descriptionRegExp.firstMatch(content);
+      final answerMatch = answerRegExp.firstMatch(content);
 
-      // Add text fields
-      request.fields['topic'] = topic;
-      request.fields['parameters'] = parameters;
+      String question = titleMatch?.group(1)?.trim() ?? '';
+      String description = descriptionMatch?.group(1)?.trim() ?? '';
+      String answer = answerMatch?.group(1)?.trim() ?? '';
 
-      // Add file if selected
-      PlatformFile? fileToUpload = _selectedFile;
-      if (fileToUpload == null && _selectedResourcePath != null) {
-        fileToUpload = await _getFileFromPath(_selectedResourcePath!);
-      }
+      // Debug print the extracted values
+      print('Extracted Title: $question');
+      print('Extracted Description: $description');
+      print('Extracted Answer: $answer');
 
-      // Add file if available
-      if (fileToUpload != null) {
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            fileToUpload.bytes!,
-            filename: fileToUpload.name,
-          ),
-        );
-      }
-
-      var response = await request.send();
-
-      if (response.statusCode == 200) {
-        var responseData = await response.stream.bytesToString();
-        return json.decode(responseData);
-      } else {
-        //print('Server Response: ${response.statusCode}');
-        //var responseData = await response.stream.bytesToString();
-        //print('Body: $responseData');
-        return null;
-      }
-    } catch (e) {
-      //print("Error in _sendRequest: $e");
-      //print("Stack Trace: $stackTrace");
-      return null;
-    }
-  }
-
-  bool _processResponse(Map<String, dynamic> responseData) {
-    if (responseData['success'] == true) {
-      String content = responseData['full_response']['choices'][0]['message']['content'];
-
-      // Extract question, options, and answer
-      String question = _extractQuestion(content);
-      String options = _extractOptions(content);
-      String answer = _extractAnswer(content);
-
+      // Validate required fields
       if (question.isEmpty || answer.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to generate valid question - missing title or answer")),
+          const SnackBar(content: Text("Generated question is missing required components")),
         );
         return false;
       }
 
-      // Create a new question form with the extracted data
+      // Create new question with the pre-combined fields
       setState(() {
         final newQuestion = _QuestionFormData(
           index: _questionFormData.length + 1,
           aiMade: true,
-        )..initializeWithExistingData(question, options, answer, true);
-        
+        )..initializeWithExistingData(question, description, answer, true);
         
         _questionFormData.add(newQuestion);
       });
       return true;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error processing response: ${e.toString()}")),
+      );
+      return false;
     }
-    return false;
-  }
-
-  String _extractQuestion(String content) {
-    RegExp questionRegex = RegExp(r'Question:\s*(.+)');
-    if (questionRegex.hasMatch(content)) {
-      return questionRegex.firstMatch(content)!.group(1)!.trim();
-    }
-    return '';
-  }
-
-  String _extractOptions(String content) {
-    RegExp optionsRegex = RegExp(r'Options:\s*([\s\S]+?)Answer:');
-    if (optionsRegex.hasMatch(content)) {
-      return optionsRegex.firstMatch(content)!.group(1)!.trim();
-    }
-    return '';
-  }
-
-  String _extractAnswer(String content) {
-    RegExp answerRegex = RegExp(r'Answer:\s*(.+)');
-    if (answerRegex.hasMatch(content)) {
-      return answerRegex.firstMatch(content)!.group(1)!.trim();
-    }
-    return '';
   }
 
   @override
@@ -526,6 +553,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
     }
+  }
+
+  bool get _hasAttachedResource {
+    return _isResourceAttached && ( _selectedResourcePath != null || _selectedResourceId != null);
   }
 
   Widget _buildResourceAttachmentSection() {
@@ -752,11 +783,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(//Create Question
-              onPressed: _addQuestionForm,
-              child: const Text("Create Question"),
-            ),
-            const SizedBox(height: 20),
             Column(// Displays the question forms here
               children: [
                 for (int i = 0; i < _questionFormData.length; i++)
@@ -771,38 +797,71 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            TextField(//Topic
-              controller: _topicController,
-              decoration: InputDecoration(
-                labelText: "Topic",
-                hintText: "Enter topic for quiz questions",
-                border: const OutlineInputBorder(),
+            ElevatedButton(//Create Question
+              onPressed: _addQuestionForm,
+              child: const Text("Create empty question"),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(// AI Question Tools button
+              onPressed: () {
+                setState(() {
+                  _showAICreationOptions = !_showAICreationOptions;
+                });
+              },
+              child: const Text("AI Question Tools"),
+            ),
+            if (_showAICreationOptions)// AI question creation dropdown
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _topicController,
+                      decoration: InputDecoration(
+                        labelText: "Topic",
+                        hintText: "Enter topic for quiz questions",
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _parametersController,
+                      decoration: InputDecoration(
+                        labelText: "Parameters",
+                        hintText: "Enter parameters for the question (e.g., 'multiple choice, difficulty: hard')",
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_hasAttachedResource) ...[
+                      SwitchListTile(
+                        title: const Text('Use attached resource for AI question creation'),
+                        subtitle: const Text('AI will use the text content from the attached file'),
+                        value: _useResourceForAI,
+                        onChanged: (bool value) {
+                          setState(() {
+                            _useResourceForAI = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _fetchQuestionsFromAI,
+                      child: const Text("Generate Questions"),
+                    ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 20),
-            TextField(//Parameters
-              controller: _parametersController,
-              decoration: InputDecoration(
-                labelText: "Parameters",
-                hintText: "Enter parameters for the question (e.g., 'multiple choice, difficulty: hard')",
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-             _buildResourceAttachmentSection(),
-            //ElevatedButton(
-            //  onPressed: _pickFile,
-            //  child: const Text("Upload PDF/JPG"),
-            //),
-            const SizedBox(height: 20),
-            if (_selectedFile != null)
-              Text("Selected File: ${_selectedFile!.name}"),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _fetchQuestionsFromAI,
-              child: const Text("Generate Questions"),
-            ),
-            const SizedBox(height: 20),
+            _buildResourceAttachmentSection(),
             // Display fetched questions
             if (_questions.isNotEmpty)
               Column(
@@ -934,12 +993,6 @@ class _QuestionFormData {
 
     // Restore listeners
     _setupListeners();
-  }
-
-  void dispose() {
-    questionTitleController.dispose();
-    questionDescriptionController.dispose();
-    questionAnswerController.dispose();
   }
 }
 
@@ -1148,6 +1201,8 @@ class _QuestionFormState extends State<_QuestionForm> {
                       TextField(
                         controller: question.questionAnswerController,
                         maxLength: question.maxQuestionAnswerLength,
+                        maxLines: 5, 
+                        minLines: 1,
                         onChanged: (value) {
                           if (question.aiMade && !question._hasBeenEdited) {
                             setState(() {});

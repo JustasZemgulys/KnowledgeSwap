@@ -8,8 +8,15 @@ import 'get_ip.dart';
 
 class TakeTestScreen extends StatefulWidget {
   final int testId;
+  final int? groupId;
+  final int? assignmentId;
 
-  const TakeTestScreen({super.key, required this.testId});
+  const TakeTestScreen({
+    super.key, 
+    required this.testId,
+    this.groupId,
+    this.assignmentId,
+  });
 
   @override
   State<TakeTestScreen> createState() => _TakeTestScreenState();
@@ -104,40 +111,53 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 if ((question['ai_made'] ?? 0) == 1)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Tooltip(
-                    message: 'AI Generated',
-                    child: Text(
-                      'AI',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8.0),
+                    child: Tooltip(
+                      message: 'AI Generated',
+                      child: Text(
+                        'AI',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(question['name'] ?? ''),
+            // Make question content scrollable if too long
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Text(question['name'] ?? ''),
+            ),
             if (question['description']?.isNotEmpty ?? false)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  question['description'],
-                  style: TextStyle(color: Colors.grey[600]),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    question['description'],
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
                 ),
               ),
             const SizedBox(height: 12),
-            TextField(
-              enabled: !isSubmitted,
-              decoration: const InputDecoration(
-                labelText: 'Your answer',
-                border: OutlineInputBorder(),
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: 60, // Minimum height for answer field
               ),
-              onChanged: (value) => userAnswers[question['id']] = value,
+              child: TextField(
+                enabled: !isSubmitted,
+                maxLines: null, // Allow multiple lines
+                decoration: const InputDecoration(
+                  labelText: 'Your answer',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) => userAnswers[question['id']] = value,
+              ),
             ),
           ],
         ),
@@ -154,6 +174,8 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
           testDetails: testDetails!,
           questions: questions,
           userAnswers: userAnswers,
+          groupId: widget.groupId,
+          assignmentId: widget.assignmentId,
         ),
       ),
     );
@@ -163,7 +185,11 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(testDetails?['name'] ?? 'Loading Test...'),
+        title: Text(
+          testDetails?['name'] ?? 'Loading Test...',
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        iconTheme: IconThemeData(color: Colors.deepPurple),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -193,20 +219,203 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
   }
 }
 
-class ReviewScreen extends StatelessWidget {
+class ReviewScreen extends StatefulWidget {
   final Map<String, dynamic> testDetails;
   final List<dynamic> questions;
   final Map<int, String> userAnswers;
+  final int? groupId;
+  final int? assignmentId;
 
   const ReviewScreen({
     super.key,
     required this.testDetails,
     required this.questions,
     required this.userAnswers,
+    this.groupId,
+    this.assignmentId, 
   });
 
+  @override
+  State<ReviewScreen> createState() => _ReviewScreenState();
+}
+
+class _ReviewScreenState extends State<ReviewScreen> {
+  bool _isSharing = false;
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  String? _serverIP;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeServerIP().then((_) {
+      if (widget.groupId != null) {
+        _shareTestAutomatically();
+      }
+    });
+  }
+
+  Future<void> _initializeServerIP() async {
+    _serverIP = await getUserIP();
+  }
+
+  Future<void> _shareTestAutomatically() async {
+  if (_serverIP == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Server connection not available')),
+    );
+    return;
+  }
+  
+  try {
+    final userInfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+    final response = await http.post(
+      Uri.parse('$_serverIP/share_test.php'),
+      body: jsonEncode({
+        'title': '${userInfo.name}\'s answers',
+        'description': '',
+        'original_test_id': widget.testDetails['id'],
+        'fk_user': userInfo.id,
+        'fk_group': widget.groupId,
+        'assignment_id': widget.assignmentId,
+        'answers': widget.userAnswers.entries.map((e) => {
+          'question_id': e.key,
+          'answer': e.value,
+        }).toList(),
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test results shared with group')),
+        );
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to share test');
+      }
+    } else {
+      throw Exception('Server returned status code ${response.statusCode}');
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error sharing test: $e')),
+    );
+  }
+}
+
+  Future<void> _shareTest() async {
+    if (!_isSharing) {
+      setState(() => _isSharing = true);
+      return;
+    }
+
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a title')),
+      );
+      return;
+    }
+
+    try {
+      final userInfo = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
+      final response = await http.post(
+        Uri.parse('$_serverIP/share_test.php'),
+        body: jsonEncode({
+          'title': _titleController.text,
+          'description': _descriptionController.text,
+          'original_test_id': widget.testDetails['id'],
+          'fk_user': userInfo.id,
+          'answers': widget.userAnswers.entries.map((e) => {
+            'question_id': e.key,
+            'answer': e.value,
+          }).toList(),
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final responseData = jsonDecode(response.body);
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test shared successfully!')),
+        );
+        setState(() => _isSharing = false);
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to share test');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sharing test: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Review: ${widget.testDetails['name']}',
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        iconTheme: IconThemeData(color: Colors.deepPurple),
+        actions: widget.groupId == null 
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.share, color: Colors.deepPurple),
+                  onPressed: _shareTest,
+                  tooltip: 'Share this test',
+                ),
+              ]
+            : null,
+        ),
+      body: Column(
+        children: [
+          if (_isSharing) ...[
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Title',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _shareTest,
+                    child: const Text('Shared Test'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+          ],
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.questions.length,
+              itemBuilder: (context, index) => _buildReviewQuestion(index),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReviewQuestion(int index) {
-    final question = questions[index];
+    final question = widget.questions[index];
     final questionNumber = question['index'] ?? index + 1;
     
     return Card(
@@ -223,64 +432,65 @@ class ReviewScreen extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 if ((question['ai_made'] ?? 0) == 1)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Tooltip(
-                    message: 'AI Generated',
-                    child: Text(
-                      'AI',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8.0),
+                    child: Tooltip(
+                      message: 'AI Generated',
+                      child: Text(
+                        'AI',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(question['name'] ?? ''),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Text(question['name'] ?? ''),
+            ),
             if (question['description']?.isNotEmpty ?? false)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(question['description']),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(question['description']),
+                ),
               ),
             const SizedBox(height: 12),
-            TextField(
-              enabled: false,
-              decoration: InputDecoration(
-                labelText: 'Your answer',
-                border: const OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.grey[200],
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: 60,
               ),
-              controller: TextEditingController(
-                text: userAnswers[question['id']] ?? 'No answer provided'),
+              child: TextField(
+                enabled: false,
+                maxLines: null,
+                decoration: InputDecoration(
+                  labelText: 'Your answer',
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+                controller: TextEditingController(
+                  text: widget.userAnswers[question['id']] ?? 'No answer provided'),
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Correct answer: ${question['answer'] ?? 'No answer provided'}',
-              style: const TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Correct answer: ${question['answer'] ?? 'No answer provided'}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Review: ${testDetails['name']}'),
-      ),
-      body: ListView.builder(
-        itemCount: questions.length,
-        itemBuilder: (context, index) => _buildReviewQuestion(index),
       ),
     );
   }

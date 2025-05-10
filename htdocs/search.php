@@ -61,69 +61,83 @@ try {
                      WHERE t.name LIKE ? AND (t.visibility = 1 OR t.fk_user = ?)",
             'params' => ['i', 's', 'i']
         ],
+        'forum_item' => [
+            'sql' => "SELECT fi.*, u.name as creator_name, v.direction as user_vote, 'forum_item' as type
+                     FROM forum_item fi
+                     LEFT JOIN user u ON fi.fk_user = u.id
+                     LEFT JOIN vote v ON v.fk_item = fi.id AND v.fk_type = 'forum_item' AND v.fk_user = ?
+                     WHERE fi.title LIKE ?",
+            'params' => ['i', 's']
+        ],
         'group' => [
-			'sql' => "SELECT g.*, 
-					 (SELECT name FROM user WHERE id = (
-						 SELECT fk_user FROM group_member 
-						 WHERE fk_group = g.id AND role = 'admin' 
-						 LIMIT 1
-					 )) as creator_name,
-					 v.direction as user_vote, 
-					 'group' as type,
-					 (SELECT COUNT(*) FROM group_member WHERE fk_group = g.id) as member_count,
-					 EXISTS(SELECT 1 FROM group_member WHERE fk_group = g.id AND fk_user = ?) as is_member,
-					 EXISTS(SELECT 1 FROM group_member WHERE fk_group = g.id AND fk_user = ? AND role = 'admin') as is_owner
-					 FROM `group` g
-					 LEFT JOIN vote v ON v.fk_item = g.id AND v.fk_type = 'group' AND v.fk_user = ?
-					 WHERE g.name LIKE ? 
-					 AND (g.visibility = 1 OR EXISTS(
-						 SELECT 1 FROM group_member 
-						 WHERE fk_group = g.id AND fk_user = ?
-					 ))",
-			'params' => ['i', 'i', 'i', 's', 'i']
-		]
+            'sql' => "SELECT g.*, 
+                     (SELECT name FROM user WHERE id = (
+                         SELECT fk_user FROM group_member 
+                         WHERE fk_group = g.id AND role = 'admin' 
+                         LIMIT 1
+                     )) as creator_name,
+                     v.direction as user_vote, 
+                     'group' as type,
+                     (SELECT COUNT(*) FROM group_member WHERE fk_group = g.id) as member_count,
+                     EXISTS(SELECT 1 FROM group_member WHERE fk_group = g.id AND fk_user = ?) as is_member,
+                     EXISTS(SELECT 1 FROM group_member WHERE fk_group = g.id AND fk_user = ? AND role = 'admin') as is_owner
+                     FROM `group` g
+                     LEFT JOIN vote v ON v.fk_item = g.id AND v.fk_type = 'group' AND v.fk_user = ?
+                     WHERE g.name LIKE ? 
+                     AND (g.visibility = 1 OR EXISTS(
+                         SELECT 1 FROM group_member 
+                         WHERE fk_group = g.id AND fk_user = ?
+                     ))",
+            'params' => ['i', 'i', 'i', 's', 'i']
+        ]
     ];
 
     // Count queries
-// Count queries - completely rewritten for MariaDB compatibility
-$countQueries = [
-    'all' => [
-        'sql' => "SELECT 
-                    (SELECT IFNULL(COUNT(*), 0) FROM resource WHERE name LIKE ? AND (visibility = 1 OR fk_user = ?)) +
-                    (SELECT IFNULL(COUNT(*), 0) FROM test WHERE name LIKE ? AND (visibility = 1 OR fk_user = ?)) +
-                    (SELECT IFNULL(COUNT(*), 0) FROM `group` WHERE name LIKE ? AND 
-                     (visibility = 1 OR EXISTS(
-                         SELECT 1 FROM group_member 
-                         WHERE fk_group = `group`.id AND fk_user = ?
-                     )))
-                  AS total",
-        'params' => ['s', 'i', 's', 'i', 's', 'i']
-    ],
-    'resource' => [
-        'sql' => "SELECT COUNT(*) AS total 
-                  FROM resource 
-                  WHERE name LIKE ? 
-                  AND (visibility = 1 OR fk_user = ?)",
-        'params' => ['s', 'i']
-    ],
-    'test' => [
-        'sql' => "SELECT COUNT(*) AS total 
-                  FROM test 
-                  WHERE name LIKE ? 
-                  AND (visibility = 1 OR fk_user = ?)",
-        'params' => ['s', 'i']
-    ],
-    'group' => [
-        'sql' => "SELECT COUNT(*) AS total 
-                  FROM `group` 
-                  WHERE name LIKE ? 
-                  AND (visibility = 1 OR EXISTS(
-                      SELECT 1 FROM group_member 
-                      WHERE fk_group = `group`.id AND fk_user = ?
-                  ))",
-        'params' => ['s', 'i']
-    ]
-];
+    $countQueries = [
+        'all' => [
+            'sql' => "SELECT 
+                        (SELECT IFNULL(COUNT(*), 0) FROM resource WHERE name LIKE ? AND (visibility = 1 OR fk_user = ?)) +
+                        (SELECT IFNULL(COUNT(*), 0) FROM test WHERE name LIKE ? AND (visibility = 1 OR fk_user = ?)) +
+                        (SELECT IFNULL(COUNT(*), 0) FROM forum_item WHERE title LIKE ?) +
+                        (SELECT IFNULL(COUNT(*), 0) FROM `group` WHERE name LIKE ? AND 
+                         (visibility = 1 OR EXISTS(
+                             SELECT 1 FROM group_member 
+                             WHERE fk_group = `group`.id AND fk_user = ?
+                         )))
+                      AS total",
+            'params' => ['s', 'i', 's', 'i', 's', 's', 'i']
+        ],
+        'resource' => [
+            'sql' => "SELECT COUNT(*) AS total 
+                      FROM resource 
+                      WHERE name LIKE ? 
+                      AND (visibility = 1 OR fk_user = ?)",
+            'params' => ['s', 'i']
+        ],
+        'test' => [
+            'sql' => "SELECT COUNT(*) AS total 
+                      FROM test 
+                      WHERE name LIKE ? 
+                      AND (visibility = 1 OR fk_user = ?)",
+            'params' => ['s', 'i']
+        ],
+        'forum_item' => [
+            'sql' => "SELECT COUNT(*) AS total 
+                      FROM forum_item 
+                      WHERE title LIKE ?",
+            'params' => ['s']
+        ],
+        'group' => [
+            'sql' => "SELECT COUNT(*) AS total 
+                      FROM `group` 
+                      WHERE name LIKE ? 
+                      AND (visibility = 1 OR EXISTS(
+                          SELECT 1 FROM group_member 
+                          WHERE fk_group = `group`.id AND fk_user = ?
+                      ))",
+            'params' => ['s', 'i']
+        ]
+    ];
 
     // Execute count query
     log_message("Preparing count query for type: $type");
@@ -138,7 +152,9 @@ $countQueries = [
     // Dynamic parameter binding for count
     $countParams = [$searchParam, $userId];
     if ($countType === 'all') {
-        $countParams = array_merge($countParams, [$searchParam, $userId, $searchParam, $userId]);
+        $countParams = array_merge($countParams, [$searchParam, $userId, $searchParam, $searchParam, $userId]);
+    } elseif ($countType === 'forum_item') {
+        $countParams = [$searchParam];
     }
     
     $countStmt->bind_param(implode('', $countData['params']), ...$countParams);
@@ -153,7 +169,7 @@ $countQueries = [
 
     // Get results
     $results = [];
-    $typesToSearch = ($type === 'all') ? ['resource', 'test', 'group'] : [$type];
+    $typesToSearch = ($type === 'all') ? ['resource', 'test', 'forum_item', 'group'] : [$type];
     
     foreach ($typesToSearch as $searchType) {
         log_message("Processing search type: $searchType");
@@ -170,8 +186,10 @@ $countQueries = [
         }
         
         // Build parameters dynamically
-        $bindParams = [$userId, $searchParam, $userId];
-        if ($searchType === 'group') {
+        $bindParams = [$userId, $searchParam];
+        if ($searchType === 'resource' || $searchType === 'test') {
+            $bindParams[] = $userId;
+        } elseif ($searchType === 'group') {
             $bindParams = [$userId, $userId, $userId, $searchParam, $userId];
         }
         $bindParams[] = $perPage;
