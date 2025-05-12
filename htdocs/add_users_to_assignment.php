@@ -18,7 +18,9 @@ try {
     
     $assignmentId = (int)$data['assignment_id'];
     $userIds = array_map('intval', $data['user_ids']);
-    $userIds = array_unique($userIds); // Remove duplicates
+    $userIds = array_unique($userIds);
+    
+    error_log("Updating assignment $assignmentId with users: " . implode(',', $userIds));
     
     // Begin transaction
     $conn->begin_transaction();
@@ -29,7 +31,10 @@ try {
         $deleteStmt = $conn->prepare($deleteQuery);
         $deleteStmt->bind_param("i", $assignmentId);
         $deleteStmt->execute();
+        $rowsDeleted = $conn->affected_rows;
         $deleteStmt->close();
+        
+        error_log("Deleted $rowsDeleted existing assignments");
         
         // Insert new assignments if there are any users
         if (!empty($userIds)) {
@@ -46,6 +51,7 @@ try {
             $insertStmt->close();
             
             $response['added_count'] = $addedCount;
+            error_log("Added $addedCount new assignments");
         }
         
         // Commit transaction
@@ -65,8 +71,10 @@ try {
 } catch (Exception $e) {
     http_response_code(500);
     $response['message'] = $e->getMessage();
+    error_log("Error updating assignment users: " . $e->getMessage());
 }
 
+header('Content-Type: application/json');
 echo json_encode($response);
 exit;
 ?>

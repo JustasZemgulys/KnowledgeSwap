@@ -24,7 +24,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const MainScreen());
       case '/main':
         _logRoute('Navigating to MainScreen');
-        return MaterialPageRoute(builder: (_) => const MainScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainScreen(),
+          maintainState: false,
+        );
       case '/test':
         _logRoute('Navigating to TestScreen');
         return MaterialPageRoute(builder: (_) => const TestScreen());
@@ -40,7 +43,10 @@ class AppRouter {
         );
       case '/resources':
         _logRoute('Navigating to ResourceScreen');
-        return MaterialPageRoute(builder: (_) => const ResourceScreen());
+        return MaterialPageRoute(
+          builder: (_) => const ResourceScreen(),
+          maintainState: false,  // Add this to prevent state preservation
+        );
       case '/edit-resource':
         final resource = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
@@ -64,7 +70,7 @@ class AppRouter {
       case '/forum':
         _logRoute('Navigating to ForumScreen');
         return MaterialPageRoute(builder: (_) => const ForumScreen());
-        
+      
       default:
         _logError('No route defined for ${settings.name}');
         return MaterialPageRoute(

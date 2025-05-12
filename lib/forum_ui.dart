@@ -183,7 +183,27 @@ class _ForumScreenState extends State<ForumScreen> {
       sortOrder = newOrder;
       currentPage = 1;
     });
-    _fetchForumItems();
+
+    if (newOrder == 'score') {
+      // Sort by score and then by name
+      setState(() {
+        forumItems.sort((a, b) {
+          int scoreA = a['score'] ?? 0;
+          int scoreB = b['score'] ?? 0;
+
+          if (scoreA != scoreB) {
+            return scoreB.compareTo(scoreA); // Higher score first
+          } else {
+            String nameA = a['title']?.toLowerCase() ?? '';
+            String nameB = b['title']?.toLowerCase() ?? '';
+            return nameA.compareTo(nameB); // Alphabetical order
+          }
+        });
+        filteredItems = List<dynamic>.from(forumItems);
+      });
+    } else {
+      _fetchForumItems(); // Fetch forum items with the new sort order
+    }
   }
 
   void _goToPage(int page) {
@@ -404,6 +424,10 @@ class _ForumScreenState extends State<ForumScreen> {
                           value: 'asc',
                           child: Text('Oldest first', 
                             style: TextStyle(color: Colors.black)),
+                        ),
+                        PopupMenuItem(
+                          value: 'score',
+                          child: Text('Sort by Score', style: TextStyle(color: Colors.black)),
                         ),
                       ],
                     ),

@@ -126,8 +126,29 @@ class _TestScreenState extends State<TestScreen> {
       sortOrder = newOrder;
       currentPage = 1;
     });
-    _fetchTests();
+
+    if (newOrder == 'score') {
+      // Sort by score and then by name
+      setState(() {
+        tests.sort((a, b) {
+          int scoreA = a['score'] ?? 0;
+          int scoreB = b['score'] ?? 0;
+
+          if (scoreA != scoreB) {
+            return scoreB.compareTo(scoreA); // Higher score first
+          } else {
+            String nameA = a['name']?.toLowerCase() ?? '';
+            String nameB = b['name']?.toLowerCase() ?? '';
+            return nameA.compareTo(nameB); // Alphabetical order
+          }
+        });
+        filteredTests = List<dynamic>.from(tests);
+      });
+    } else {
+      _fetchTests(); // Fetch tests with the new sort order
+    }
   }
+
 
   void _goToPage(int page) {
     setState(() {
@@ -509,6 +530,10 @@ class _TestScreenState extends State<TestScreen> {
                           value: 'asc',
                           child: Text('Oldest first', 
                             style: TextStyle(color: Colors.black)),
+                        ),
+                        PopupMenuItem(
+                          value: 'score',
+                          child: Text('Sort by Score', style: TextStyle(color: Colors.black)),
                         ),
                       ],
                     ),

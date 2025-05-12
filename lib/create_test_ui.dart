@@ -190,44 +190,78 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           ),
         );
       } else if (_useResourceForAI && _selectedResourcePath != null) {
-        PlatformFile? resourceFile = await _getFileFromPath(_selectedResourcePath!);
-        if (resourceFile != null) {
-          request.files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              resourceFile.bytes!,
-              filename: resourceFile.name,
-            ),
-          );
-        }
+        request.fields['resource_path'] = _selectedResourcePath!;
       }
 
       var response = await request.send();
       var responseData = await response.stream.bytesToString();
 
-      // Dismiss loading snackbar
       loadingSnackBar.close();
 
-      if (response.statusCode == 200) {
+      try {
+        final decoded = json.decode(responseData);
+        
+        // Handle the special "resource too large" case
+        if (decoded['error'] == 'resource_too_large') {
+          debugPrint("API Token Limit Error: ${decoded['error_details']}");
+          _showResourceTooLargeError();
+          return;
+        }
+        
+        // Handle other error cases
+        if (decoded['success'] == false) {
+          _showErrorSnackbar(decoded['error'] ?? "Failed to generate questions");
+          return;
+        }
+        
+        // Process successful response
         _processResponse(responseData);
-      } else {
-        throw Exception("Server returned status ${response.statusCode}");
+        
+      } catch (e) {
+        // Fallback for non-JSON responses
+        if (responseData.contains('too large for model') || 
+            responseData.contains('maximum context length')) {
+          _showResourceTooLargeError();
+          return;
+        }
+        
+        // Handle other non-JSON responses
+        if (response.statusCode == 200) {
+          _processResponse(responseData);
+        } else {
+          _showErrorSnackbar("An error occurred while generating questions");
+        }
       }
     } catch (e) {
-      // Dismiss loading snackbar on error
       loadingSnackBar.close();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to generate questions: ${e.toString()}")),
-        );
-        print(e);
-      }
+      _showErrorSnackbar("Failed to generate questions");
+      debugPrint("Error: ${e.toString()}");
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
       }
     }
+  }
+
+  void _showResourceTooLargeError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          "The resource is too large for AI processing. Please try with a different resource.",
+          style: TextStyle(color: Colors.white),
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _selectExistingResource() async {
@@ -340,6 +374,18 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   bool _processResponse(String content) {
     try {
+      if (content.contains('too large for model') || 
+        content.contains('maximum context length')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("The resource is too large for AI processing. Please try a smaller file."),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        print("The resource is too large for AI processing. Please try a smaller file.");
+        return false;
+      }
+
       // Parse the bracket-formatted response
       final titleRegExp = RegExp(r'\[TITLE\](.*?)\[\/TITLE\]', caseSensitive: false);
       final descriptionRegExp = RegExp(r'\[DESCRIPTION\](.*?)\[\/DESCRIPTION\]', caseSensitive: false, dotAll: true);
@@ -354,16 +400,12 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       String description = descriptionMatch?.group(1)?.trim() ?? '';
       String answer = answerMatch?.group(1)?.trim() ?? '';
 
-      // Debug print the extracted values
-      print('Extracted Title: $question');
-      print('Extracted Description: $description');
-      print('Extracted Answer: $answer');
-
       // Validate required fields
       if (question.isEmpty || answer.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Generated question is missing required components")),
+          const SnackBar(content: Text("Failed to generate question. Please try again.")),
         );
+        print("Failed to generate question. Please try again. Generated question is missing required components.");
         return false;
       }
 
@@ -379,8 +421,12 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
       return true;
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error processing response: ${e.toString()}")),
+        SnackBar(
+          content: Text("Error processing response: ${e.toString()}"),
+          duration: Duration(seconds: 5),
+        ),
       );
+      print("Error processing response: ${e.toString()}");
       return false;
     }
   }
@@ -644,7 +690,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     // Clean paths by removing leading slashes and encoding special characters
     final cleanIconPath = iconPath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
     final cleanFilePath = filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
-    print('$serverIP/$cleanIconPath');
     // 1. First try to show icon image if available (resource_photo_link)
     if (cleanIconPath.isNotEmpty) {
       final iconUrl = '$serverIP/$cleanIconPath';

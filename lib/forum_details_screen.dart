@@ -466,7 +466,15 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forum Discussion'),
+        title: Text(
+          'Forum Discussion',
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: Colors.deepPurple),
         actions: [
           if (forumItem != null && forumItem!['fk_user'] == userInfo.id)
             PopupMenuButton<String>(

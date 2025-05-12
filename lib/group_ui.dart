@@ -118,7 +118,27 @@ class _GroupScreenState extends State<GroupScreen> {
       sortOrder = newOrder;
       currentPage = 1;
     });
-    _fetchGroups();
+
+    if (newOrder == 'score') {
+      // Sort by score and then by name
+      setState(() {
+        groups.sort((a, b) {
+          int scoreA = a['score'] ?? 0;
+          int scoreB = b['score'] ?? 0;
+
+          if (scoreA != scoreB) {
+            return scoreB.compareTo(scoreA); // Higher score first
+          } else {
+            String nameA = a['name']?.toLowerCase() ?? '';
+            String nameB = b['name']?.toLowerCase() ?? '';
+            return nameA.compareTo(nameB); // Alphabetical order
+          }
+        });
+        filteredGroups = List<dynamic>.from(groups);
+      });
+    } else {
+      _fetchGroups(); // Fetch groups with the new sort order
+    }
   }
 
   void _goToPage(int page) {
@@ -459,7 +479,11 @@ class _GroupScreenState extends State<GroupScreen> {
                                                 groupName: groupName,
                                               ),
                                             ),
-                                          );
+                                          ).then((value) {
+                                            if (value == true) {
+                                              _fetchGroups(); // Refresh the list when returning
+                                            }
+                                          });
                                         },
                                         child: const Text('Enter Group'),
                                       )
@@ -713,6 +737,10 @@ class _GroupScreenState extends State<GroupScreen> {
                                 value: 'asc',
                                 child: Text('Oldest first',
                                   style: TextStyle(color: Colors.black)),
+                              ),
+                              PopupMenuItem(
+                                value: 'score',
+                                child: Text('Sort by Score', style: TextStyle(color: Colors.black)),
                               ),
                             ],
                           ),

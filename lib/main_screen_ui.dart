@@ -29,7 +29,6 @@ class _MainScreenState extends State<MainScreen> {
     
     if (userProvider.userInfo == null) {
       final isLoggedIn = await userProvider.tryAutoLogin();
-      userinfo = userProvider.userInfo!;
       if (!isLoggedIn && mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -70,7 +69,11 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             icon: Image.asset("assets/usericon.jpg"),
@@ -84,8 +87,6 @@ class _MainScreenState extends State<MainScreen> {
             },
           ),
         ],
-        elevation: 0,
-        backgroundColor: Colors.white,
       ),
       body: Stack(
         children: [
@@ -97,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
           // Main content
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(4),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final columnCount = _calculateColumnCount(constraints.maxWidth);
@@ -109,15 +110,9 @@ class _MainScreenState extends State<MainScreen> {
                     _buildNavCard(0, Icons.question_mark, "Tests"),
                     _buildNavCard(1, Icons.folder, "Resources"),
                     _buildNavCard(2, Icons.search, "Search"),
-                    // Offset the last two items
-                    if (columnCount == 2) ...[
-                      _buildNavCard(3, Icons.people, "Groups"),
-                      const SizedBox(), // Empty space to create offset
-                      _buildNavCard(4, Icons.forum, "Forum"),
-                    ] else ...[
-                      _buildNavCard(3, Icons.people, "Groups"),
-                      _buildNavCard(4, Icons.forum, "Forum"),
-                    ],
+                    _buildNavCard(3, Icons.people, "Groups"),
+                    _buildNavCard(4, Icons.forum, "Forum"),
+
                   ],
                 );
               },
@@ -141,12 +136,12 @@ class _MainScreenState extends State<MainScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () => _onItemTapped(index),
-        splashColor: Colors.deepPurple.withOpacity(0.2),
-        highlightColor: Colors.deepPurple.withOpacity(0.1),
+        splashColor: Colors.deepPurple,
+        highlightColor: Colors.deepPurple,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -155,7 +150,7 @@ class _MainScreenState extends State<MainScreen> {
               Icon(
                 icon,
                 size: 48,
-                color: isSelected ? Colors.deepPurple : Colors.grey[800],
+                color: Colors.deepPurple,
               ),
               const SizedBox(height: 16),
               Text(
@@ -163,7 +158,7 @@ class _MainScreenState extends State<MainScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.deepPurple : Colors.grey[800],
+                  color: Colors.deepPurple,
                 ),
               ),
             ],
@@ -175,7 +170,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onItemTapped(int index) async {
     if (_routeNames[index] == '/resources') {
-      final result = await Navigator.pushNamed(context, '/resources');
+      final result = await Navigator.pushReplacementNamed(context, '/resources');
       if (result != null && result is Map) {
         setState(() => _currentIndex = index);
       }

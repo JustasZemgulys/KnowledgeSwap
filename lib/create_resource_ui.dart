@@ -82,6 +82,12 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       return;
     }
 
+    if (_selectedFile != null && _selectedFile!.size > 30000 * 1024) {
+      _showErrorSnackBar('File size exceeds 30MB limit');
+      return;
+    }
+
+
     if (_selectedFile != null && !['pdf', 'jpg', 'jpeg', 'png'].contains(_fileType)) {
       _showErrorSnackBar('Only PDF, JPG, and PNG files are allowed for resources');
       return;
@@ -357,6 +363,22 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       );
 
       if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        
+        // Check file size (30,000 KB limit)
+        if (file.size > 30000 * 1024) { // Convert KB to bytes
+          _showErrorSnackBar('File size exceeds 30MB limit');
+          return;
+        }
+
+        // Check for protected PDF
+        if (file.extension?.toLowerCase() == 'pdf' && file.bytes != null) {
+          final isProtected = await _isPdfProtected(file.bytes!);
+          if (isProtected) {
+            _showErrorSnackBar('Protected PDFs cannot be used for AI generation');
+          }
+        }
+
         setState(() {
           _selectedFile = result.files.first;
           _fileName = _selectedFile!.name;
@@ -366,6 +388,19 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
       }
     } catch (e) {
       _showErrorSnackBar('Error picking file: $e');
+    }
+  }
+
+  Future<bool> _isPdfProtected(Uint8List pdfBytes) async {
+    try {
+      final pdfText = String.fromCharCodes(pdfBytes);
+      // Check for common PDF protection markers
+      return pdfText.contains('/Encrypt') || 
+            pdfText.contains('/CryptFilter') ||
+            pdfText.contains('/Standard') && pdfText.contains('/Encryption');
+    } catch (e) {
+      // If we can't read the content, assume it's protected
+      return true;
     }
   }
 
@@ -678,7 +713,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
             ),
             const SizedBox(height: 5),
             const Text(
-              'Allowed file types: PDF, JPG, PNG',
+              'Allowed file types: PDF, JPG, PNG\nMax file size 30MB',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 20),
@@ -707,7 +742,7 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
             ),
             const SizedBox(height: 5),
             const Text(
-              'Allowed file types: JPG, PNG',
+              'Allowed file types: JPG, PNG \nMax file size 30MB',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 10),

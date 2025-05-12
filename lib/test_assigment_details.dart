@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/forum_details_screen.dart';
 import 'package:knowledgeswap/user_info_provider.dart';
 import 'package:provider/provider.dart';
@@ -38,6 +39,22 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
   void initState() {
     super.initState();
     _initializeServerIP().then((_) => _fetchAssignedUsers());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register the route observer
+    final route = ModalRoute.of(context);
+    if (route is PageRoute && route.isCurrent) {
+      _fetchAssignedUsers();
+    }
+  }
+
+  @override
+  void dispose() {
+    // Unregister the route observer
+    super.dispose();
   }
 
   Future<void> _initializeServerIP() async {
@@ -93,6 +110,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       final responseData = json.decode(response.body);
       
       if (responseData['success'] == true) {
+        // Update the local state with the new user list
         setState(() {
           _assignedUsers = updatedUserList;
         });
@@ -101,7 +119,8 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
           SnackBar(content: Text(responseData['message'] ?? 'Users updated successfully')),
         );
         
-        Navigator.pop(context, {'users_updated': true});
+        // Refresh the data from server to ensure consistency
+        await _fetchAssignedUsers();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Failed to update users')),
@@ -251,76 +270,153 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     final previewPath = (resource['resource_photo_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
     final resourcePath = (resource['resource_link'] ?? '').trim().replaceAll(RegExp(r'^/+'), '');
     final resourceName = resource['name'] ?? 'Untitled Resource';
+    final resourceId = resource['id'];
 
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: InkWell(
-        onTap: () => _downloadResource(resourcePath, resourceName),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                color: Colors.grey[100],
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => _downloadResource(resourcePath, resourceName),
+            child: Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Center(
-                child: _buildResourcePreview(
-                  previewPath.isNotEmpty ? previewPath : resourcePath,
-                  resourceName,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              elevation: 2,
+              child: Stack(
                 children: [
-                  Text(
-                    resourceName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                          color: Colors.grey[100],
+                        ),
+                        child: Center(
+                          child: _buildResourcePreview(
+                            previewPath.isNotEmpty ? previewPath : resourcePath,
+                            resourceName,
+                          ),
+                        ),
+                      ),
+                      
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              resourceName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Uploaded: ${resource['creation_date']?.split(' ')[0] ?? 'Unknown'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                  
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+
+                      ),
+                    ),
+                  ),
+                  
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'discussions',
+                          child: ListTile(
+                            leading: Icon(Icons.forum, size: 20),
+                            title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                      ],
+                      onSelected: (value) async {
+                        if (value == 'discussions') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DiscussionScreen(
+                                itemId: resourceId,
+                                itemType: 'resource',
+                              ),
+                            ),
+                          );
+                        } else if (value == 'remove') {
+                          // Implement remove functionality if needed
+                        }
+                      },
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildTestCard(Map<String, dynamic> test) {
+    final currentUser = Provider.of<UserInfoProvider>(context).userInfo;
+    final hasCompleted = _assignedUsers.any((user) =>
+        user['id'] == currentUser?.id && user['completed'] == true);
+
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(vertical: 8), // Adjust margin as needed
+      color: hasCompleted ? Colors.grey[200] : null,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TakeTestScreen(
-                testId: test['id'],
-                groupId: widget.groupId,
-                assignmentId: widget.assignment['id'],
-              ),
-            ),
-          );
-        },
-        child: Padding(
+        onTap: hasCompleted
+            ? null // Disable tap if completed
+            : () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TakeTestScreen(
+                      testId: test['id'],
+                      groupId: widget.groupId,
+                      assignmentId: widget.assignment['id'],
+                    ),
+                  ),
+                );
+
+                if (result == true && mounted) {
+                  await _fetchAssignedUsers(); // Refresh the data immediately
+                  setState(() {}); // Trigger UI update
+                }
+              },
+        child: Container(
+          width: double.infinity, // Ensure the container takes full width
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,11 +427,6 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Created by: ${test['creator_name'] ?? 'Unknown'}',
-                style: TextStyle(color: Colors.grey[600]),
               ),
               if (!_canTakeTest && widget.assignment['open_date'] != null)
                 Padding(
@@ -568,6 +659,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = Provider.of<UserInfoProvider>(context).userInfo;
     final assignment = widget.assignment;
     final test = assignment['test'];
     final resource = assignment['resource'];
@@ -580,10 +672,19 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     final userInfo = Provider.of<UserInfoProvider>(context).userInfo;
     final isAdmin = userInfo?.id == assignment['creator']['id'];
     final isModerator = false; // Implement your moderator check logic here
+    final title = assignment['name'];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(assignment['name']),
+        title: Text(
+          'Assignment: ${title}',
+          style: TextStyle(color: Colors.deepPurple),
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: Colors.deepPurple),
         actions: [
           if (isAdmin || isModerator)
             PopupMenuButton<String>(
@@ -670,10 +771,24 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                   'Assigned Users (${_assignedUsers.length})',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                TextButton(
-                  onPressed: _addUsersToAssignment,
-                  child: const Text('Manage Users'),
-                ),
+                if (isAdmin || isModerator) ...[
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _addUsersToAssignment,
+                        child: const Text('Add Users'),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          'Adding more users will reset existing user completion/scores',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             _isLoading
@@ -681,8 +796,12 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                 : _assignedUsers.isEmpty
                     ? const Center(child: Text('No users assigned yet'))
                     : Column(
-                        children: _assignedUsers.map((user) => _buildUserTile(user)).toList(),
+                        children: _assignedUsers
+                          .where((user) => user['id'] == currentUser?.id || isAdmin || isModerator) 
+                          .map((user) => _buildUserTile(user))
+                          .toList(),
                       ),
+          
           ],
         ),
       ),
@@ -703,7 +822,8 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       
       if (kIsWeb) {
         html.window.open(fullUrl, '_blank');
-      } else {
+      } 
+      else {
         final fileExt = resourcePath.split('.').last.toLowerCase();
         final mimeTypes = {
           'pdf': 'application/pdf',
@@ -719,16 +839,12 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
           ..setAttribute('type', mimeType)
           ..click();
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening $resourceName...')),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to open resource: $e')),
       );
     }
-  }
+}
 
   Widget _buildResourcePreview(String path, String resourceName) {
     if (path.isEmpty) {
@@ -770,4 +886,5 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       },
     );
   }
+
 }

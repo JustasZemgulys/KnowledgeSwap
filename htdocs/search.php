@@ -66,7 +66,7 @@ try {
                      FROM forum_item fi
                      LEFT JOIN user u ON fi.fk_user = u.id
                      LEFT JOIN vote v ON v.fk_item = fi.id AND v.fk_type = 'forum_item' AND v.fk_user = ?
-                     WHERE fi.title LIKE ?",
+                     WHERE fi.title LIKE ? AND fi.fk_group IS NULL",
             'params' => ['i', 's']
         ],
         'group' => [

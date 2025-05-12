@@ -6,8 +6,9 @@ import 'user_info_provider.dart';
 
 class EditGroupScreen extends StatefulWidget {
   final Map<String, dynamic> group;
+  final Function(bool)? onGroupUpdated; // Add this callback
 
-  const EditGroupScreen({super.key, required this.group});
+  const EditGroupScreen({super.key, required this.group, this.onGroupUpdated});
 
   @override
   State<EditGroupScreen> createState() => _EditGroupScreenState();
@@ -27,6 +28,14 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
     return CreateGroupScreen(
       initialData: widget.group,
       isEditMode: true,
+      onGroupUpdated: () {
+        // Call the callback if it exists, otherwise just pop with true
+        if (widget.onGroupUpdated != null) {
+          widget.onGroupUpdated!(true);
+        } else {
+          Navigator.pop(context, true);
+        }
+      },
     );
   }
 }

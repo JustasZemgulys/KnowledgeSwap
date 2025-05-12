@@ -31,21 +31,32 @@ if (empty($topic)) {
 
 // Handle file upload and text extraction if resource should be used
 $extractedText = "";
-if ($useResourceText && isset($_FILES['file'])) {
+if ($useResourceText) {
     log_message("Processing attached resource for text extraction");
-    $file = $_FILES['file'];
-    $filePath = $file['tmp_name'];
-    $fileType = $file['type'];
+    
+    try {
+        if (isset($_FILES['file'])) {
+            $file = $_FILES['file'];
+            $filePath = $file['tmp_name'];
+            $fileType = $file['type'];
+            $extractedText = trim(extractTextFromFile($filePath, $fileType));
+        } elseif (!empty($_POST['resource_path'])) {
+            $filePath = $_POST['resource_path'];
+            $fileType = mime_content_type($filePath);
+            $extractedText = trim(extractTextFromFile($filePath, $fileType));
+        } else {
+            throw new Exception("No file or resource path provided for text extraction");
+        }
 
-    $extractionResult = extractTextFromFile($filePath, $fileType);
-    if (is_array($extractionResult)) {
-        echo "Failed to extract text from resource";
-        exit;
-    }
-    $extractedText = trim($extractionResult);
-
-    if (empty($extractedText)) {
-        echo "Resource text extraction returned empty content";
+        if (empty($extractedText)) {
+            throw new Exception("Text extraction completed but returned no readable content - the file may be image-based or contain no text");
+        }
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => "Text extraction failed: " . $e->getMessage(),
+            'error_type' => 'text_extraction'
+        ]);
         exit;
     }
 }
@@ -183,18 +194,42 @@ try {
         throw new Exception("CURL error: " . curl_error($ch));
     }
 
-    $responseData = json_decode($response, true);
-
     if ($httpCode !== 200) {
-        throw new Exception("API error: " . ($responseData['message'] ?? 'Unknown error'));
-    }
+		$responseData = json_decode($response, true);
+		$errorMessage = $responseData['message'] ?? 'Unknown API error';
+		
+		// Check for token limit error
+		if (strpos($errorMessage, 'too large for model') !== false || 
+			strpos($errorMessage, 'maximum context length') !== false) {
+			echo json_encode([
+				'success' => false,
+				'error' => 'resource_too_large', // Special error code
+				'error_details' => $errorMessage // For logging
+			]);
+		} else {
+			echo json_encode([
+				'success' => false,
+				'error' => $errorMessage,
+				'error_type' => 'api_error'
+			]);
+		}
+		exit;
+	}
 
     // Extract the response content
+	$responseData = json_decode($response, true);
 	$aiResponse = $responseData['choices'][0]['message']['content'] ?? '';
 	log_message("AI Response Content: $aiResponse");
-
-	// In the validation section, replace with this version:
-
+	
+	if (strpos($aiResponse, 'too large for model') !== false) {
+        echo json_encode([
+            'success' => false,
+            'error' => "The resource is too large for processing",
+            'error_type' => 'token_limit'
+        ]);
+        exit;
+    }
+	
 	// Extract and normalize the response
 	$aiResponse = $responseData['choices'][0]['message']['content'] ?? '';
 	$aiResponse = preg_replace('/\r\n|\r/', "\n", trim($aiResponse));
@@ -288,7 +323,12 @@ try {
 	
 } catch (Exception $e) {
     log_message("API Error: " . $e->getMessage());
-    echo "Processing error: {$e->getMessage()}";
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage(),
+        'error_type' => 'processing_error'
+    ]);
+    exit;
 } finally {
     if (isset($ch)) curl_close($ch);
 }
@@ -313,14 +353,14 @@ function extractTextFromPDF($filePath) {
         log_message("Text extracted from PDF");
         
         if (empty(trim($text))) {
-            throw new Exception("No text content found - possibly image-based PDF");
+            throw new Exception("PDF appears to be image-based or empty - no readable text content found");
         }
         
         return $text;
         
     } catch (\Exception $e) {
         log_message("PDF Error: " . $e->getMessage());
-        throw $e;
+        throw new Exception("PDF processing failed: " . $e->getMessage());
     }
 }
 
@@ -354,11 +394,7 @@ function extractTextFromFile($filePath, $fileType) {
                     log_message("PDF processing completed in " . (time() - $startTime) . " seconds");
                     return $text;
                 } catch (Exception $e) {
-                    return [
-                        "error" => "PDF processing failed",
-                        "details" => $e->getMessage(),
-                        "solution" => "Please upload a smaller, non-secured, text-based PDF"
-                    ];
+                    throw new Exception("PDF processing failed: " . $e->getMessage());
                 }
                 
             case 'image/jpeg':
@@ -375,11 +411,7 @@ function extractTextFromFile($filePath, $fileType) {
         
     } catch (Exception $e) {
         log_message("Extraction Error after " . (time() - $startTime) . " seconds: " . $e->getMessage());
-        return [
-            "error" => "Text extraction failed",
-            "details" => $e->getMessage(),
-            "processing_time" => (time() - $startTime) . " seconds"
-        ];
+        throw new Exception("Text extraction failed: " . $e->getMessage());
     }
 }
 
@@ -466,6 +498,7 @@ function ocrWithCloudService($filePath, $fileType) {
         
         if (empty($text)) {
             log_message("OCR returned empty text");
+			throw new Exception("OCR completed but returned no readable text - the image may be blurry or contain no text");
         }
 
         return $text;

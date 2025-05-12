@@ -63,17 +63,25 @@ class _ResourceScreenState extends State<ResourceScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _fetchResources() async {
     if (serverIP == null) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
 
     try {
       final url = Uri.parse('$serverIP/get_resources.php?page=$currentPage&per_page=$itemsPerPage&sort=$sortOrder&user_id=${user_info.id}');
 
       final response = await http.get(url);
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -121,8 +129,29 @@ class _ResourceScreenState extends State<ResourceScreen> {
       sortOrder = newOrder;
       currentPage = 1;
     });
-    _fetchResources();
+
+    if (newOrder == 'score') {
+      // Sort by score and then by name
+      setState(() {
+        resources.sort((a, b) {
+          int scoreA = a['score'] ?? 0;
+          int scoreB = b['score'] ?? 0;
+
+          if (scoreA != scoreB) {
+            return scoreB.compareTo(scoreA); // Higher score first
+          } else {
+            String nameA = a['name']?.toLowerCase() ?? '';
+            String nameB = b['name']?.toLowerCase() ?? '';
+            return nameA.compareTo(nameB); // Alphabetical order
+          }
+        });
+        filteredResources = List<dynamic>.from(resources);
+      });
+    } else {
+      _fetchResources(); // Fetch resources with the new sort order
+    }
   }
+
 
   void _goToPage(int page) {
     setState(() {
@@ -673,6 +702,10 @@ Widget build(BuildContext context) {
                               value: 'asc',
                               child: Text('Oldest first',
                                 style: TextStyle(color: Colors.black)),
+                            ),
+                            PopupMenuItem(
+                              value: 'score',
+                              child: Text('Sort by Score', style: TextStyle(color: Colors.black)),
                             ),
                           ],
                         ),

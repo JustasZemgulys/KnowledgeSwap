@@ -47,19 +47,28 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
-  bool _isLoggedIn = false;
-  String? _initialRoute;
-
+  
   @override
   void initState() {
     super.initState();
     _initializeApp();
   }
-
+  
   Future<void> _initializeApp() async {
     final userProvider = Provider.of<UserInfoProvider>(context, listen: false);
-    _isLoggedIn = await userProvider.tryAutoLogin();
-    _initialRoute = await WebStorage.getLastRoute();
+    final isLoggedIn = await userProvider.tryAutoLogin();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => isLoggedIn
+              ? FutureBuilder<Widget>(
+                  future: WebStorage.getLastRoute().then((route) => AppRouter.getScreenFromRoute(route ?? '/main')),
+                  builder: (context, snapshot) => snapshot.data ?? const SizedBox.shrink()) : const WelcomeScreen()),
+        (route) => false,
+      );
+    });
     
     setState(() {
       _isLoading = false;
@@ -73,9 +82,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-
-    return _isLoggedIn
-        ? AppRouter.getScreenFromRoute(_initialRoute ?? '/main')
-        : const WelcomeScreen();
+    
+    // Return an empty container since we're handling navigation in initState
+    return const SizedBox.shrink();
   }
 }

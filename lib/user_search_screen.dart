@@ -23,7 +23,8 @@ class UserSearchScreen extends StatefulWidget {
 class _UserSearchScreenState extends State<UserSearchScreen> {
   // ignore: non_constant_identifier_names
   late UserInfo user_info;
-  List<dynamic> _users = [];
+  List<dynamic> _allUsers = []; // All users in the group
+  List<dynamic> _filteredUsers = []; // Users filtered by search
   List<dynamic> _selectedUsers = [];
   bool _isLoading = false;
   bool _selectAll = false;
@@ -57,10 +58,10 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['group'] != null) {
           setState(() {
-            _users = List<dynamic>.from(data['group']['members'] ?? []);
+            _allUsers = List<dynamic>.from(data['group']['members'] ?? []);
+            _filteredUsers = List.from(_allUsers);
             _isLoading = false;
-            _selectAll = _users.every((user) => 
-              _selectedUsers.any((selected) => selected['id'] == user['id']));
+            _updateSelectAllState();
           });
         } else {
           throw Exception(data['message'] ?? 'Failed to load group members');
@@ -78,16 +79,41 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     }
   }
 
+  void _updateSelectAllState() {
+    setState(() {
+      _selectAll = _filteredUsers.isNotEmpty && 
+          _filteredUsers.every((user) => 
+            _selectedUsers.any((selected) => selected['id'] == user['id']));
+    });
+  }
+
+  void _filterUsers(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredUsers = List.from(_allUsers);
+      } else {
+        final lowerQuery = query.toLowerCase();
+        _filteredUsers = _allUsers.where((user) {
+          final name = user['name']?.toString().toLowerCase() ?? '';
+          final email = user['email']?.toString().toLowerCase() ?? '';
+          return name.contains(lowerQuery) || email.contains(lowerQuery);
+        }).toList();
+      }
+      _updateSelectAllState();
+    });
+  }
+
   void _toggleUserSelection(dynamic user) {
     setState(() {
-      if (_selectedUsers.any((u) => u['id'] == user['id'])) {
-        _selectedUsers.removeWhere((u) => u['id'] == user['id']);
+      final existingIndex = _selectedUsers.indexWhere((u) => u['id'] == user['id']);
+      if (existingIndex >= 0) {
+        // User is already selected - remove them
+        _selectedUsers.removeAt(existingIndex);
       } else {
+        // User is not selected - add them
         _selectedUsers.add(user);
       }
-      // Update select all state
-      _selectAll = _users.every((user) => 
-        _selectedUsers.any((selected) => selected['id'] == user['id']));
+      _updateSelectAllState();
     });
   }
 
@@ -95,15 +121,16 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     setState(() {
       _selectAll = !_selectAll;
       if (_selectAll) {
-        // Add all users that aren't already selected
-        for (var user in _users) {
+        // Add all filtered users that aren't already selected
+        for (var user in _filteredUsers) {
           if (!_selectedUsers.any((u) => u['id'] == user['id'])) {
             _selectedUsers.add(user);
           }
         }
       } else {
-        // Clear all selections
-        _selectedUsers.clear();
+        // Only remove the filtered users from selection
+        final filteredUserIds = _filteredUsers.map((u) => u['id']).toSet();
+        _selectedUsers.removeWhere((u) => filteredUserIds.contains(u['id']));
       }
     });
   }
@@ -159,10 +186,17 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                 ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filterUsers('');
+                        },
+                      )
+                    : null,
               ),
-              onChanged: (value) {
-                // Implement search if needed
-              },
+              onChanged: _filterUsers,
             ),
           ),
           Padding(
@@ -175,7 +209,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 TextButton(
-                  onPressed: _users.isNotEmpty ? _toggleSelectAll : null,
+                  onPressed: _filteredUsers.isNotEmpty ? _toggleSelectAll : null,
                   child: Row(
                     children: [
                       Icon(
@@ -194,12 +228,18 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _users.isEmpty
-                    ? const Center(child: Text('No users found'))
+                : _filteredUsers.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty
+                              ? 'No users found in group'
+                              : 'No users match your search',
+                        ),
+                      )
                     : ListView.builder(
-                        itemCount: _users.length,
+                        itemCount: _filteredUsers.length,
                         itemBuilder: (context, index) {
-                          return _buildUserTile(_users[index]);
+                          return _buildUserTile(_filteredUsers[index]);
                         },
                       ),
           ),

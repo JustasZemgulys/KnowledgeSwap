@@ -1,9 +1,17 @@
 <?php
+ini_set('memory_limit', '256M');
+ini_set('max_execution_time', 300);
+set_time_limit(300);
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once 'db_connect.php';
 
 $conn = getDBConnection();
 
-error_reporting(0); // Turn off error reporting in production
+error_reporting(0);
 
 $response = [
     'success' => false,
@@ -50,17 +58,25 @@ try {
     }
 
     // Process resource file
-    $resourceExt = strtolower(pathinfo($resourceFile['name'], PATHINFO_EXTENSION));
-    if (!in_array($resourceExt, ['pdf', 'jpg', 'jpeg', 'png'])) {
-        throw new Exception("Invalid resource file type. Only PDF, JPG, PNG allowed");
-    }
+	$resourceExt = strtolower(pathinfo($resourceFile['name'], PATHINFO_EXTENSION));
+	if (!in_array($resourceExt, ['pdf', 'jpg', 'jpeg', 'png'])) {
+		throw new Exception("Invalid resource file type. Only PDF, JPG, PNG allowed");
+	}
 
-    $resourceFilename = uniqid() . '_' . basename($resourceFile['name']);
-    $resourcePath = $resourceDir . $resourceFilename;
-    
-    if (!move_uploaded_file($resourceFile['tmp_name'], $resourcePath)) {
-        throw new Exception("Failed to upload resource file");
-    }
+	$resourceFilename = uniqid() . '_' . basename($resourceFile['name']);
+	$resourcePath = $resourceDir . $resourceFilename;
+
+	// Use stream copying for large files
+	$src = fopen($resourceFile['tmp_name'], 'rb');
+	$dest = fopen($resourcePath, 'wb');
+
+	if (!$src || !$dest) {
+		throw new Exception("Failed to open file streams");
+	}
+
+	stream_copy_to_stream($src, $dest);
+	fclose($src);
+	fclose($dest);
 
     // Process icon file if provided
     $iconPath = null;

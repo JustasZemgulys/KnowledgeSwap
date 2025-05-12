@@ -16,8 +16,9 @@ import 'package:flutter/foundation.dart' show Uint8List;
 class CreateGroupScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
   final bool isEditMode;
+  final VoidCallback? onGroupUpdated;
 
-  const CreateGroupScreen({super.key, this.initialData, this.isEditMode = false});
+  const CreateGroupScreen({super.key, this.initialData, this.isEditMode = false, this.onGroupUpdated});
 
   @override
   State<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -146,7 +147,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         ..fields['description'] = _groupDescriptionController.text
         ..fields['visibility'] = _isPrivate ? '0' : '1';
 
-      // Add new icon if provided (removal is handled separately)
       if (_iconBytes != null && _iconBytes!.isNotEmpty) {
         request.files.add(http.MultipartFile.fromBytes(
           'icon_file',
@@ -154,7 +154,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           filename: _iconName,
         ));
       } else if (_iconBytes == null && widget.initialData?['icon_path'] != null) {
-        // This indicates we want to remove the existing icon
         request.fields['remove_icon'] = '1';
       }
 
@@ -164,17 +163,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(responseBody);
         if (jsonResponse['success'] == true) {
-          Navigator.pop(context, true); // Return success
+          // Call the callback if it exists
+          if (widget.onGroupUpdated != null) {
+            widget.onGroupUpdated!();
+          } else {
+            Navigator.pop(context, true); // Fallback if no callback
+          }
         } else {
           _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
         }
       } else {
         _showErrorSnackBar('Server error: ${response.statusCode}');
       }
-    } on SocketException {
-      _showErrorSnackBar('Network error - check connection');
-    } on TimeoutException {
-      _showErrorSnackBar('Request timed out');
     } catch (e) {
       _showErrorSnackBar('Error: ${e.toString()}');
     }

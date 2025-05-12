@@ -66,13 +66,30 @@ class _SearchScreenState extends State<SearchScreen> {
       );
 
       final response = await http.get(url);
-      
+
       if (response.statusCode == 200) {
         try {
           final data = jsonDecode(response.body);
           if (data is Map && data.containsKey('success')) {
             setState(() {
               results = List<dynamic>.from(data['results'] ?? []);
+
+              // Sort results by score and then by name if sortOrder is 'score'
+              if (sortOrder == 'score') {
+                results.sort((a, b) {
+                  int scoreA = a['score'] ?? 0;
+                  int scoreB = b['score'] ?? 0;
+
+                  if (scoreA != scoreB) {
+                    return scoreB.compareTo(scoreA); // Higher score first
+                  } else {
+                    String nameA = a['name']?.toLowerCase() ?? '';
+                    String nameB = b['name']?.toLowerCase() ?? '';
+                    return nameA.compareTo(nameB); // Alphabetical order
+                  }
+                });
+              }
+
               totalResults = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
               isLoading = false;
             });
@@ -570,6 +587,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   items: const [
                     DropdownMenuItem(value: 'desc', child: Text('Newest first')),
                     DropdownMenuItem(value: 'asc', child: Text('Oldest first')),
+                    DropdownMenuItem(value: 'score', child: Text('Sort by Score')),
                   ],
                   onChanged: (value) {
                     setState(() => sortOrder = value!);

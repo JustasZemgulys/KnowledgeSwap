@@ -247,7 +247,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           'group_id': widget.groupId,
           'user_id': userId,
           'role': role,
-          'requesting_user_id': user_info.id, // Add this line
+          'requesting_user_id': user_info.id,
         }),
       );
 
@@ -306,7 +306,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           SnackBar(content: Text(responseData['message'] ?? 'Invitation sent successfully')),
         );
         _emailController.clear();
-        _fetchGroupDetails(); // Refresh the member list
+        _fetchGroupDetails();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Failed to send invitation')),
@@ -333,12 +333,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          /*if (isAdmin && currentUserRole != 'admin')
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
-              title: const Text('Make Admin'),
-              onTap: () => Navigator.pop(context, 'make_admin'),
-            ),*/
           if (isAdmin && currentUserRole != 'admin' && currentUserRole != 'moderator')
             ListTile(
               leading: const Icon(Icons.security, color: Colors.green),
@@ -375,9 +369,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     switch (action) {
       case 'remove':
         await _removeUser(member['id']);
+        setState(() {});
         break;
       case 'ban':
         await _banUser(member['id']);
+        setState(() {});
         break;
       case 'make_admin':
         await _updateUserRole(member['id'], 'admin');
@@ -409,7 +405,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Successfully left the group')),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true); // Notify parent to refresh
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Failed to leave group')),
@@ -443,7 +439,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
     if (confirmed == true) {
       await _deleteGroup();
-      Navigator.pop(context);
+      Navigator.pop(context, true); 
     }
   }
 
@@ -476,15 +472,29 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Future<void> _editGroup() async {
     if (groupDetails == null) return;
     
-    final result = await Navigator.push(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditGroupScreen(group: groupDetails!),
+        builder: (context) => EditGroupScreen(
+          group: groupDetails!,
+          onGroupUpdated: (success) {
+            // This callback will be called from EditGroupScreen
+            if (success) {
+              // Refresh all data
+              _fetchGroupDetails();
+              _fetchAttachedResources();
+              _fetchAttachedTests();
+              _fetchTestAssignments();
+            }
+            Navigator.pop(context, success); // Close the edit screen
+          },
+        ),
       ),
     );
     
-    if (result == true) {
-      _fetchGroupDetails();
+    // This will handle cases where the edit screen is closed without saving
+    if (result == true && mounted) {
+      setState(() {});
     }
   }
 
@@ -507,7 +517,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           body: json.encode({
             'group_id': widget.groupId,
             'resource_id': resourceId,
-            'user_id': user_info.id, // To verify permissions
+            'user_id': user_info.id,
           }),
         );
 
@@ -540,7 +550,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         body: json.encode({
           'group_id': widget.groupId,
           'resource_id': resourceId,
-          'user_id': user_info.id, // To verify permissions
+          'user_id': user_info.id,
         }),
       );
 
@@ -668,15 +678,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final isModerator = groupDetails?['user_role'] == 'moderator';
 
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      elevation: 2,
       child: InkWell(
+        borderRadius: BorderRadius.circular(10),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => TakeTestScreen(
                 testId: test['id'],
-                groupId: widget.groupId, // Pass the group ID here
               ),
             ),
           );
@@ -754,25 +768,28 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final isAdmin = groupDetails?['user_role'] == 'admin';
     final isModerator = groupDetails?['user_role'] == 'moderator';
 
-      return StatefulBuilder(
+    return StatefulBuilder(
       builder: (context, setState) {
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onTap: () => _downloadResource(resourcePath, resourceName),
             child: Card(
-              margin: const EdgeInsets.all(8),
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 2,
               child: Stack(
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Resource Preview (clickable area)
                       Container(
                         height: 200,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
                           color: Colors.grey[100],
                         ),
                         child: Center(
@@ -783,7 +800,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         ),
                       ),
                       
-                      // Resource Info
                       Padding(
                         padding: const EdgeInsets.all(12),
                         child: Column(
@@ -825,12 +841,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     ],
                   ),
                   
-                  // Voting buttons
                   Positioned(
                     top: 8,
                     left: 8,
                     child: GestureDetector(
-                      onTap: () {}, // Empty to prevent click propagation
+                      onTap: () {},
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.8),
@@ -915,7 +930,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     ),
                   ),
                   
-                  // More options menu
                   Positioned(
                     top: 8,
                     right: 8,
@@ -976,13 +990,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       final cleanPath = resourcePath.replaceAll(RegExp(r'^/+'), '');
       final fullUrl = '$serverIP/$cleanPath';
       
-      // For web, open in new tab
       if (kIsWeb) {
         html.window.open(fullUrl, '_blank');
       } 
-      // For mobile, download the file
       else {
-        // Extract file extension
         final fileExt = resourcePath.split('.').last.toLowerCase();
         final mimeTypes = {
           'pdf': 'application/pdf',
@@ -992,7 +1003,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         };
         final mimeType = mimeTypes[fileExt] ?? 'application/octet-stream';
 
-        // Create download link
         // ignore: unused_local_variable
         final anchor = html.AnchorElement(href: fullUrl)
           ..setAttribute('download', resourceName)
@@ -1086,77 +1096,138 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
   }
 
+  Future<void> _deleteAssignment(int assignmentId) async {
+    try {
+      final url = Uri.parse('$serverIP/delete_test_assignment.php');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'assignment_id': assignmentId,
+        }),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (responseData['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Assignment deleted successfully')),
+        );
+        _fetchTestAssignments(); // Refresh the list of assignments
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete assignment')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting assignment: $e')),
+      );
+    }
+  }
+
   Widget _buildAssignmentCard(Map<String, dynamic> assignment) {
-    final openDate = assignment['open_date'] != null 
+    final openDate = assignment['open_date'] != null
         ? DateTime.parse(assignment['open_date'])
         : null;
-    final dueDate = assignment['due_date'] != null 
+    final dueDate = assignment['due_date'] != null
         ? DateTime.parse(assignment['due_date'])
         : null;
     final testName = assignment['test']['name'];
     final resource = assignment['resource'];
     final assignedCount = assignment['assigned_users_count'];
+    final isAdmin = groupDetails?['user_role'] == 'admin';
+    final isModerator = groupDetails?['user_role'] == 'moderator';
 
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      elevation: 2,
       child: InkWell(
+        borderRadius: BorderRadius.circular(10),
         onTap: () async {
-        final result = await Navigator.push<Map<String, dynamic>>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TestAssignmentDetailScreen(
-              assignment: assignment,
-              groupId: widget.groupId,
-              userRole: groupDetails?['user_role'],
+          final result = await Navigator.push<Map<String, dynamic>>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TestAssignmentDetailScreen(
+                assignment: assignment,
+                groupId: widget.groupId,
+                userRole: groupDetails?['user_role'],
+              ),
             ),
-          ),
-        );
-        if (result != null && result['users_updated'] == true) {
-          _fetchTestAssignments();
-        }
-      },
+          );
+          if (result != null && result['users_updated'] == true) {
+            _fetchTestAssignments();
+          }
+        },
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                assignment['name'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      assignment['name'],
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isAdmin || isModerator)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'remove',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                            title: Text('Delete Assignment', style: TextStyle(fontSize: 14, color: Colors.red)),
+                          ),
+                        ),
+                      ],
+                      onSelected: (value) async {
+                        if (value == 'remove') {
+                          await _deleteAssignment(assignment['id']);
+                        }
+                      },
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
                 'Test: $testName',
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
+              const SizedBox(height: 4),
               if (resource != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     'Resource: ${resource['name']}',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ),
-              const SizedBox(height: 8),
-              if (openDate != null)
-                Text(
-                  'Opens: ${DateFormat('MMM dd, yyyy HH:mm').format(openDate)}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              if (dueDate != null)
+              if (openDate != null || dueDate != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    'Due: ${DateFormat('MMM dd, yyyy HH:mm').format(dueDate)}',
+                    '${openDate != null ? 'Opens: ${DateFormat('MMM dd, yyyy').format(openDate)}' : ''}'
+                    '${openDate != null && dueDate != null ? ' • ' : ''}'
+                    '${dueDate != null ? 'Due: ${DateFormat('MMM dd, yyyy').format(dueDate)}' : ''}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
-                'Assigned to $assignedCount users',
+                'Assigned to $assignedCount ${assignedCount == 1 ? 'user' : 'users'}',
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
             ],
@@ -1165,7 +1236,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ),
     );
   }
-    
+
+
   @override
   Widget build(BuildContext context) {
     if (groupDetails != null && groupDetails!['user_role'] == 'banned') {
@@ -1175,20 +1247,24 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           const SnackBar(content: Text('You are banned from this group')),
         );
       });
-      return Scaffold(appBar: AppBar(), body: Container()); // Empty screen while redirecting
+      return Scaffold(appBar: AppBar(), body: Container());
     }
 
     final isAdmin = groupDetails?['user_role'] == 'admin';
     final isModerator = groupDetails?['user_role'] == 'moderator';
+    final memberCount = groupDetails?['member_count'] ?? 0;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Group Details',
           style: TextStyle(color: Colors.deepPurple),
-          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.deepPurple),
+        elevation: 0,
+        scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         actions: [
           PopupMenuButton<String>(
             itemBuilder: (context) {
@@ -1312,95 +1388,132 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         widget.groupName,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${groupDetails!['member_count'] ?? 0} members',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
                       const SizedBox(height: 16),
                       Text(
                         groupDetails!['description'] ?? 'No description',
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                       const SizedBox(height: 20),
+                      
+                      // Members Section
                       Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ExpansionTile(
-                          title: const Text('Members'),
+                          title: Text('Members ($memberCount)'),  // Added member count to title
                           initiallyExpanded: _isMembersExpanded,
                           onExpansionChanged: (expanded) {
                             setState(() {
                               _isMembersExpanded = expanded;
                             });
                           },
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          collapsedShape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
                           children: [
-                            if (members.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Text('No members found'),
-                              )
-                            else
-                              ...members.map((member) {
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundImage: member['profile_picture'] != null 
-                                        ? NetworkImage(
-                                            member['profile_picture'].startsWith('http')
-                                                ? member['profile_picture']
-                                                : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(member['profile_picture'])}',
-                                          )
-                                        : null,
-                                    child: member['profile_picture'] == null 
-                                        ? const Icon(Icons.person)
-                                        : null,
-                                  ),
-                                  title: Text(member['name'] ?? 'Unknown'),
-                                  subtitle: member['role'] == 'admin'
-                                      ? const Text('Admin', style: TextStyle(color: Colors.blue))
-                                      : member['role'] == 'moderator'
-                                          ? const Text('Moderator', style: TextStyle(color: Colors.green))
-                                          : null,
-                                  trailing: (isAdmin || isModerator) && 
-                                            member['id'] != user_info.id
-                                      ? IconButton(
-                                          icon: const Icon(Icons.more_vert),
-                                          onPressed: () => _showUserActions(context, member),
-                                        )
-                                      : null,
-                                );
-                              }),
-                            
-                            if (isAdmin || isModerator)
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              child: Container(
+                                color: Theme.of(context).cardColor,
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    TextField(
-                                      controller: _emailController,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Invite by email',
-                                        hintText: 'Enter user email',
-                                        border: OutlineInputBorder(),
+                                    if (members.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: Text('No members found'),
+                                      )
+                                    else
+                                      ...members.map((member) {
+                                        return ListTile(
+                                          leading: CircleAvatar(
+                                            backgroundImage: member['profile_picture'] != null 
+                                                ? NetworkImage(
+                                                    member['profile_picture'].startsWith('http')
+                                                        ? member['profile_picture']
+                                                        : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(member['profile_picture'])}',
+                                                  )
+                                                : null,
+                                            child: member['profile_picture'] == null 
+                                                ? const Icon(Icons.person)
+                                                : null,
+                                          ),
+                                          title: Text(member['name'] ?? 'Unknown'),
+                                          subtitle: member['role'] == 'admin'
+                                              ? const Text('Admin', style: TextStyle(color: Colors.blue))
+                                              : member['role'] == 'moderator'
+                                                  ? const Text('Moderator', style: TextStyle(color: Colors.green))
+                                                  : null,
+                                          trailing: (isAdmin || isModerator) && 
+                                                    member['id'] != user_info.id
+                                              ? IconButton(
+                                                  icon: const Icon(Icons.more_vert),
+                                                  onPressed: () => _showUserActions(context, member),
+                                                )
+                                              : null,
+                                        );
+                                      }),
+                                    
+                                    if (isAdmin || isModerator)
+                                      Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            TextField(
+                                              controller: _emailController,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Invite by email',
+                                                hintText: 'Enter user email',
+                                                border: OutlineInputBorder(),
+                                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                              ),
+                                              keyboardType: TextInputType.emailAddress,
+                                            ),
+                                            const SizedBox(height: 10),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                              ),
+                                              onPressed: _isInviting ? null : _inviteUserByEmail,
+                                              child: _isInviting 
+                                                  ? const SizedBox(
+                                                      height: 20,
+                                                      width: 20,
+                                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                                    )
+                                                  : const Text('Invite to Group'),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      keyboardType: TextInputType.emailAddress,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ElevatedButton(
-                                      onPressed: _isInviting ? null : _inviteUserByEmail,
-                                      child: _isInviting 
-                                          ? const CircularProgressIndicator()
-                                          : const Text('Invite to Group'),
-                                    ),
                                   ],
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),
+
+                      // Banned Users Section
                       if (isAdmin || isModerator)
                         Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: ExpansionTile(
                             title: const Text('Banned Users'),
                             initiallyExpanded: _isBannedUsersExpanded,
@@ -1409,124 +1522,250 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 _isBannedUsersExpanded = expanded;
                               });
                             },
+                            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                              side: BorderSide.none,
+                            ),
+                            collapsedShape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              side: BorderSide.none,
+                            ),
                             children: [
-                              if (bannedUsers.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text('No banned users'),
-                                )
-                              else
-                                ...bannedUsers.map((user) {
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundImage: user['profile_picture'] != null 
-                                          ? NetworkImage(
-                                              user['profile_picture'].startsWith('http')
-                                                  ? user['profile_picture']
-                                                  : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
-                                            )
-                                          : null,
-                                      child: user['profile_picture'] == null 
-                                          ? const Icon(Icons.person)
-                                          : null,
-                                    ),
-                                    title: Text(user['name'] ?? 'Unknown'),
-                                    subtitle: const Text('Banned', style: TextStyle(color: Colors.red)),
-                                    trailing: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () => _unbanUser(user['id']),
-                                      child: const Text('Unban'),
-                                    ),
-                                  );
-                                }),
-                            ],
-                          ),
-                        ),
-                      if (attachedResources.isNotEmpty)
-                        Card(
-                          child: ExpansionTile(
-                            title: const Text('Attached Resources'),
-                            initiallyExpanded: _isResourcesExpanded,
-                            onExpansionChanged: (expanded) {
-                              setState(() {
-                                _isResourcesExpanded = expanded;
-                              });
-                            },
-                            children: [
-                              if (attachedResources.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text('No resources attached'),
-                                )
-                              else if (attachedResources.isNotEmpty || isAdmin || isModerator)
-                                if (isAdmin || isModerator)
-                                  ListTile(
-                                    leading: const Icon(Icons.add),
-                                    title: const Text('Attach Resource'),
-                                    onTap: _attachResourceToGroup,
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                                child: Container(
+                                  color: Theme.of(context).cardColor,
+                                  child: Column(
+                                    children: [
+                                      if (bannedUsers.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No banned users'),
+                                        )
+                                      else
+                                        ...bannedUsers.map((user) {
+                                          return ListTile(
+                                            leading: CircleAvatar(
+                                              backgroundImage: user['profile_picture'] != null 
+                                                  ? NetworkImage(
+                                                      user['profile_picture'].startsWith('http')
+                                                          ? user['profile_picture']
+                                                          : '$serverIP/image_proxy.php?path=${Uri.encodeComponent(user['profile_picture'])}',
+                                                    )
+                                                  : null,
+                                              child: user['profile_picture'] == null 
+                                                  ? const Icon(Icons.person)
+                                                  : null,
+                                            ),
+                                            title: Text(user['name'] ?? 'Unknown'),
+                                            subtitle: const Text('Banned', style: TextStyle(color: Colors.red)),
+                                            trailing: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.green,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onPressed: () => _unbanUser(user['id']),
+                                              child: const Text('Unban'),
+                                            ),
+                                          );
+                                        }),
+                                    ],
                                   ),
-                                ...attachedResources.map((resource) {
-                                  return _buildResourceCard(resource);
-                                }),
-                            ],
-                          ),
-                        ),
-                      if (attachedTests.isNotEmpty)
-                        Card(
-                          child: ExpansionTile(
-                            title: const Text('Attached Tests'),
-                            initiallyExpanded: _isTestsExpanded,
-                            onExpansionChanged: (expanded) {
-                              setState(() {
-                                _isTestsExpanded = expanded;
-                              });
-                            },
-                            children: [
-                              if (attachedTests.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text('No tests attached'),
-                                )
-                              else
-                                ...attachedTests.map((test) => _buildTestCard(test)),
-                              if (isAdmin || isModerator)
-                                ListTile(
-                                  leading: const Icon(Icons.add),
-                                  title: const Text('Attach Test'),
-                                  onTap: _attachTestToGroup,
                                 ),
-                            ],
-                          ),
-                        ),
-                      if (isAdmin || isModerator)
-                        Card(
-                          child: ExpansionTile(
-                            title: const Text('Test Assignments'),
-                            initiallyExpanded: _isAssignmentsExpanded,
-                            onExpansionChanged: (expanded) {
-                              setState(() {
-                                _isAssignmentsExpanded = expanded;
-                              });
-                            },
-                            children: [
-                              if (testAssignments.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text('No test assignments yet'),
-                                )
-                              else
-                                ...testAssignments.map((assignment) => _buildAssignmentCard(assignment)),
-                              ListTile(
-                                leading: const Icon(Icons.add),
-                                title: const Text('Create New Assignment'),
-                                onTap: _createTestAssignment,
                               ),
                             ],
                           ),
                         ),
+
+                      // Attached Resources Section
+                      Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text('Attached Resources'),
+                          initiallyExpanded: _isResourcesExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isResourcesExpanded = expanded;
+                            });
+                          },
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          collapsedShape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              child: Container(
+                                color: Theme.of(context).cardColor,
+                                child: Column(
+                                  children: [
+                                    if (attachedResources.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: Text('No resources attached'),
+                                      )
+                                    else
+                                      ...attachedResources.map((resource) => _buildResourceCard(resource)),
+                                    if (isAdmin || isModerator)
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: ElevatedButton.icon(
+                                          icon: const Icon(Icons.attach_file, size: 20),
+                                          label: const Text('Attach Resource'),
+                                          style: ElevatedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                            minimumSize: const Size(double.infinity, 48),
+                                          ),
+                                          onPressed: _attachResourceToGroup,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Attached Tests Section
+                      Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text('Attached Tests'),
+                          initiallyExpanded: _isTestsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isTestsExpanded = expanded;
+                            });
+                          },
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          collapsedShape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              child: Container(
+                                color: Theme.of(context).cardColor,
+                                child: Column(
+                                  children: [
+                                    if (attachedTests.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: Text('No tests attached'),
+                                      )
+                                    else
+                                      ...attachedTests.map((test) => _buildTestCard(test)),
+                                    if (isAdmin || isModerator)
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: ElevatedButton.icon(
+                                          icon: const Icon(Icons.assignment, size: 20),
+                                          label: const Text('Attach Test'),
+                                          style: ElevatedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                            minimumSize: const Size(double.infinity, 48),
+                                          ),
+                                          onPressed: _attachTestToGroup,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Test Assignments Section - Now visible to all members
+                      Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text('Test Assignments'),
+                          initiallyExpanded: _isAssignmentsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isAssignmentsExpanded = expanded;
+                            });
+                          },
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          collapsedShape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            side: BorderSide.none,
+                          ),
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              child: Container(
+                                color: Theme.of(context).cardColor,
+                                child: Column(
+                                  children: [
+                                    if (testAssignments.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: Text('No test assignments yet'),
+                                      )
+                                    else
+                                      ...testAssignments.map((assignment) => _buildAssignmentCard(assignment)),
+                                    if (isAdmin || isModerator)
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: ElevatedButton.icon(
+                                          icon: const Icon(Icons.add, size: 20),
+                                          label: const Text('Create New Assignment'),
+                                          style: ElevatedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                            minimumSize: const Size(double.infinity, 48),
+                                          ),
+                                          onPressed: _createTestAssignment,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),

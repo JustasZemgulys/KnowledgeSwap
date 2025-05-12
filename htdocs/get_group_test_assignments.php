@@ -23,6 +23,8 @@ try {
 			t.name as test_name,
 			r.id as resource_id,
 			r.name as resource_name,
+			r.resource_photo_link as resource_photo_link,
+			r.resource_link as resource_link,
 			u.id as creator_id,
 			u.name as creator_name,
 			COUNT(tau.fk_user) as assigned_users_count,
@@ -68,7 +70,9 @@ try {
             ],
             'resource' => $row['resource_id'] ? [
                 'id' => (int)$row['resource_id'],
-                'name' => $row['resource_name']
+                'name' => $row['resource_name'],
+				'resource_link' => $row['resource_link'],
+				'resource_photo_link' => $row['resource_photo_link']
             ] : null,
             'creator' => [
                 'id' => (int)$row['creator_id'],

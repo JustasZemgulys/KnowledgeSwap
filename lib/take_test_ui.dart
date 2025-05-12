@@ -359,16 +359,25 @@ class _ReviewScreenState extends State<ReviewScreen> {
           'Review: ${widget.testDetails['name']}',
           style: TextStyle(color: Colors.deepPurple),
         ),
-        iconTheme: IconThemeData(color: Colors.deepPurple),
-        actions: widget.groupId == null 
-            ? [
-                IconButton(
-                  icon: const Icon(Icons.share, color: Colors.deepPurple),
-                  onPressed: _shareTest,
-                  tooltip: 'Share this test',
-                ),
-              ]
-            : null,
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        actions: [
+          // Show share button only if not part of a group assignment
+          if (widget.groupId == null) 
+            IconButton(
+              icon: const Icon(Icons.share, color: Colors.deepPurple),
+              onPressed: _shareTest,
+              tooltip: 'Share this test',
+            ),
+          // Always show done button
+          IconButton(
+            icon: const Icon(Icons.done, color: Colors.deepPurple),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
         ),
       body: Column(
         children: [
