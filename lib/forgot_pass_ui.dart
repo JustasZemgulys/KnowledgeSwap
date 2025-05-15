@@ -5,7 +5,8 @@ import 'dart:convert';
 import 'get_ip.dart';
 
 Future<String?> sendMail(String recipientEmail, BuildContext context) async {
-  String userIP = await getUserIP();
+  final getIP = GetIP();
+  String userIP = await getIP.getUserIP();
   final sendMailApiUrl = '$userIP/send_reminder.php';
   try {
     final response = await http.post(
@@ -159,7 +160,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   _ChangePasswordScreenState({required this.email});
 
   Future<void> changePassword(String email, String newPassword) async {
-    String userIP = await getUserIP();
+    final getIP = GetIP();
+    String userIP = await getIP.getUserIP();
     final String apiUrl = '$userIP/change_password.php';
     final response = await http.post(
       Uri.parse(apiUrl),

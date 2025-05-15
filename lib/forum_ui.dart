@@ -50,7 +50,8 @@ class _ForumScreenState extends State<ForumScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       _fetchForumItems();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

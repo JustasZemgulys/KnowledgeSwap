@@ -47,14 +47,14 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error connecting to server: $e')),
       );
     }
   }
-
 
   Future<void> _submitDiscussion() async {
     if (_formKey.currentState!.validate() && serverIP != null) {

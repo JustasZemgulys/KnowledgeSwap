@@ -38,7 +38,8 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   void saveUserInfo() async {
-    String userIP = await getUserIP();
+    final getIP = GetIP();
+    final userIP = await getIP.getUserIP();
     final apiUrl = '$userIP/settings.php';
 
     // Get the updated user information
@@ -180,7 +181,8 @@ class _SettingScreenState extends State<SettingScreen> {
 
     if (confirm == true) {
       // User confirmed, proceed with account deletion
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final apiUrl = '$userIP//deleteaccount.php';
 
       try {

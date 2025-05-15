@@ -53,7 +53,8 @@ class _TestScreenState extends State<TestScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       _fetchTests();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

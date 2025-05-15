@@ -46,7 +46,8 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       await _fetchForumItem();
       if (widget.hasTest) {
         await _fetchTestDetails();

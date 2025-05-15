@@ -40,7 +40,8 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    _serverIP = await getUserIP();
+    final getIP = GetIP();
+    _serverIP = await getIP.getUserIP();
   }
 
   Future<void> _fetchGroupMembers() async {

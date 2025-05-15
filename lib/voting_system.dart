@@ -51,7 +51,8 @@ class VotingController {
     if (userInfo == null) return;
 
     try {
-      final serverIP = await getUserIP();
+      final getIP = GetIP();
+      String serverIP = await getIP.getUserIP();
       final url = Uri.parse('$serverIP/vote.php');
 
       final response = await http.post(

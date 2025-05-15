@@ -47,7 +47,8 @@ class _DiscussionScreenState extends State<DiscussionScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       await _fetchItemDetails();
       await _fetchComments();
     } catch (e) {

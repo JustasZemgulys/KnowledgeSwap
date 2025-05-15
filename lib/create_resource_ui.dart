@@ -120,7 +120,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
   Future<void> _createResource() async {
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final url = Uri.parse('$userIP/create_resource.php');
 
       var request = http.MultipartRequest('POST', url)
@@ -169,7 +170,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
 
   Future<void> _updateResource() async {
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final url = Uri.parse('$userIP/update_resource.php');
 
       var request = http.MultipartRequest('POST', url)
@@ -240,7 +242,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     //print('Attempting to load icon from path: $iconPath');
 
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final encodedPath = Uri.encodeComponent(iconPath);
       final url = Uri.parse('$userIP/image_proxy.php?path=$encodedPath');
       
@@ -281,7 +284,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     //print('Attempting to load file from path: $filePath');
 
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final encodedPath = Uri.encodeComponent(filePath);
       final fileType = path.basename(filePath).split('.').last.toLowerCase();
       
@@ -483,7 +487,8 @@ class _CreateResourceScreenState extends State<CreateResourceScreen> {
     }
 
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final url = '$userIP/delete_icon.php';
       
       final response = await http.post(

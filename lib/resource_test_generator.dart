@@ -21,7 +21,8 @@ class ResourceTestGenerator {
         const SnackBar(content: Text('Generating test questions...')),
       );
 
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final url = '$userIP/generate_resource_test.php';
 
       final questionsWithOrder = questions.asMap().map((index, question) => MapEntry(

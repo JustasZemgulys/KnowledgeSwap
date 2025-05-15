@@ -79,7 +79,8 @@ class _CreateTestAssignmentScreenState extends State<CreateTestAssignmentScreen>
   }
 
   Future<void> _initializeServerIP() async {
-    _serverIP = await getUserIP();
+    final getIP = GetIP();
+    _serverIP = await getIP.getUserIP();
   }
 
   Future<void> _selectTest() async {

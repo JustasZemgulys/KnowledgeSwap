@@ -40,7 +40,8 @@ class _TakeTestScreenState extends State<TakeTestScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       await _fetchTestDetails();
       await _fetchQuestions();
     } catch (e) {
@@ -256,7 +257,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    _serverIP = await getUserIP();
+    final getIP = GetIP();
+    _serverIP = await getIP.getUserIP();
   }
 
   Future<void> _shareTestAutomatically() async {

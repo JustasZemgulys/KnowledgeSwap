@@ -33,7 +33,8 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    serverIP = await getUserIP();
+    final getIP = GetIP();
+    serverIP = await getIP.getUserIP();
   }
 
   Future<void> _performSearch() async {

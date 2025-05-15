@@ -43,7 +43,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    serverIP = await getUserIP();
+    final getIP = GetIP();
+    serverIP = await getIP.getUserIP();
   }
 
   Future<void> _performSearch() async {

@@ -69,7 +69,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    String userIP = await getUserIP();
+    final getIP = GetIP();
+    final userIP = await getIP.getUserIP();
     final apiUrl = '$userIP/check_existing.php';
     email = emailController.text;
     password = passwordController.text;
@@ -122,7 +123,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (verificationCode != null) {
       bool verified = await showVerificationDialog(verificationCode);
       if (verified) {
-        String userIP = await getUserIP();
+        final getIP = GetIP();
+        final userIP = await getIP.getUserIP();
         final registerApiUrl = '$userIP/register.php';
         try {
           final registerResponse = await http.post(
@@ -179,7 +181,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<String?> sendMail(String recipientEmail, BuildContext context) async {
-    String userIP = await getUserIP();
+    final getIP = GetIP();
+    final userIP = await getIP.getUserIP();
     final sendMailApiUrl = '$userIP/send_email.php';
     try {
       final response = await http.post(

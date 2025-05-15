@@ -58,7 +58,8 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
   }
 
   Future<void> _initializeServerIP() async {
-    _serverIP = await getUserIP();
+    final getIP = GetIP();
+    _serverIP = await getIP.getUserIP();
   }
 
   Future<void> _fetchAssignedUsers() async {

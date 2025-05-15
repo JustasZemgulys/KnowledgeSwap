@@ -75,7 +75,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    serverIP = await getUserIP();
+    final getIP = GetIP();
+    serverIP = await getIP.getUserIP();
   }
 
   Future<void> _initializeSelectedFile() async {
@@ -96,7 +97,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     if (widget.initialTestData == null) return;
 
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      String userIP = await getIP.getUserIP();
       final url = '$userIP/get_questions.php?test_id=${widget.initialTestData!['id']}';
       final response = await http.get(Uri.parse(url));
 
@@ -170,7 +172,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     setState(() => isLoading = true);
 
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final String url = '$userIP/ai_create_question.php';
 
       var request = http.MultipartRequest('POST', Uri.parse(url));
@@ -300,7 +303,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<Map<String, dynamic>> _fetchResourceDetails(int resourceId) async {
     try {
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      String userIP = await getIP.getUserIP();
       final url = '$userIP/get_resource_details.php?resource_id=$resourceId';
       final response = await http.get(Uri.parse(url));
       
@@ -329,7 +333,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
 
   Future<PlatformFile?> _getFileFromPath(String path) async {
     try {
-      final serverIP = await getUserIP();
+      final getIP = GetIP();
+      String serverIP = await getIP.getUserIP();
       
       // Clean the path by removing leading slashes and encoding special characters
       final cleanPath = path.replaceAll(RegExp(r'^/+'), '').replaceAll(' ', '%20');
@@ -557,7 +562,8 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
         testData['testId'] = widget.initialTestData!['id'];
       }
 
-      final userIP = await getUserIP();
+      final getIP = GetIP();
+      String userIP = await getIP.getUserIP();
       final url = widget.initialTestData != null 
           ? '$userIP/update_test.php'
           : '$userIP/create_test.php';

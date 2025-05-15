@@ -54,7 +54,8 @@ class _ResourceScreenState extends State<ResourceScreen> {
 
   Future<void> _initializeServerIP() async {
     try {
-      serverIP = await getUserIP();
+      final getIP = GetIP();
+      serverIP = await getIP.getUserIP();
       _fetchResources();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

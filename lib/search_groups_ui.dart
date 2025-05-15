@@ -35,7 +35,8 @@ class _SearchGroupsScreenState extends State<SearchGroupsScreen> {
   }
 
   Future<void> _initializeServerIP() async {
-    serverIP = await getUserIP();
+    final getIP = GetIP();
+    serverIP = await getIP.getUserIP();
   }
 
   Future<void> _performSearch() async {

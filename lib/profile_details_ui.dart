@@ -54,7 +54,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     });
 
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final response = await http.get(
         Uri.parse('$userIP/user_data.php?user_id=${userinfo.id}'),
       );
@@ -80,11 +81,12 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
         _isLoadingGroups = false;
       });
     }
-}
+  }
 
   Future<void> _deleteTest(int testId) async {
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final response = await http.post(
         Uri.parse('$userIP/delete_test.php'),
         body: {'test_id': testId.toString()},
@@ -109,7 +111,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   Future<void> _deleteResource(int resourceId) async {
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final response = await http.post(
         Uri.parse('$userIP/delete_resource.php'),
         body: {'resource_id': resourceId.toString()},
@@ -134,7 +137,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   Future<void> _deleteForumItem(int forumItemId) async {
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final response = await http.post(
         Uri.parse('$userIP/delete_forum_item.php'),
         body: {'forum_item_id': forumItemId.toString()},
@@ -159,7 +163,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   Future<void> _leaveGroup(int groupId) async {
     try {
-      String userIP = await getUserIP();
+      final getIP = GetIP();
+      final userIP = await getIP.getUserIP();
       final response = await http.post(
         Uri.parse('$userIP/leave_group.php'),
         body: {'group_id': groupId.toString()},
@@ -777,7 +782,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   Future<void> updateProfilePicture(String newImageUrl, int userId) async {
     if (newImageUrl == "") newImageUrl = "default";
 
-    String userIP = await getUserIP();
+    final getIP = GetIP();
+    final userIP = await getIP.getUserIP();
     final String apiUrl = '$userIP/profile_pic.php';
     final response = await http.post(
       Uri.parse(apiUrl),

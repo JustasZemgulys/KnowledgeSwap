@@ -10,38 +10,54 @@ import 'app_router.dart';
 import 'get_ip.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  final http.Client? httpClient;
+  final UserInfoProvider? userInfoProvider;
+
+  const LoginPage({Key? key, this.httpClient, this.userInfoProvider})
+      : super(key: key);
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  TextEditingController usernameController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  late final http.Client httpClient;
+  UserInfoProvider? userInfoProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    // Use injected client if provided, else default
+    httpClient = widget.httpClient ?? http.Client();
+    // UserInfoProvider can be injected or obtained from context lazily
+    userInfoProvider = widget.userInfoProvider;
+  }
 
   Future<void> loginUser() async {
     if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
-      showDialog(
+      await showDialog(
         context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text("Please fill all fields"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("OK"),
-              ),
-            ],
-          );
-        },
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text("Please fill all fields"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
       );
       return;
     }
 
     try {
-      String userIP = await getUserIP();
-      final response = await http.post(
+      final getIP = GetIP();
+      String userIP = await getIP.getUserIP();
+
+      final response = await httpClient.post(
         Uri.parse('$userIP/login.php'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -54,13 +70,14 @@ class _LoginPageState extends State<LoginPage> {
         final responseData = jsonDecode(response.body);
         if (responseData['success']) {
           UserInfo userInfo = UserInfo.fromJson(responseData['userData']);
-          UserInfoProvider userInfoProvider =
-              Provider.of<UserInfoProvider>(context, listen: false);
-          await userInfoProvider.setUserInfo(userInfo);
 
-          // Get last route or default to main screen
+          // Use injected userInfoProvider or obtain from context
+          final provider = userInfoProvider ??
+              Provider.of<UserInfoProvider>(context, listen: false);
+          await provider.setUserInfo(userInfo);
+
           final lastRoute = await WebStorage.getLastRoute() ?? '/main';
-          
+
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
@@ -70,40 +87,36 @@ class _LoginPageState extends State<LoginPage> {
             (route) => false,
           );
         } else {
-          showDialog(
+          await showDialog(
             context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text("Wrong username or password"),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text("OK"),
-                  ),
-                ],
-              );
-            },
-          );
-        }
-      } else {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text("Server Error"),
-              content: Text("Status code: ${response.statusCode}"),
+            builder: (BuildContext context) => AlertDialog(
+              title: const Text("Wrong username or password"),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text("OK"),
                 ),
               ],
-            );
-          },
+            ),
+          );
+        }
+      } else {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text("Server Error"),
+            content: Text("Status code: ${response.statusCode}"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
         );
       }
     } catch (e) {
-      showDialog(
+      await showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Error'),
@@ -140,38 +153,35 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              child: const Text(
-                "Welcome back!",
-                style: TextStyle(
-                    fontFamily: "Karla-LightItalic",
-                    fontStyle: FontStyle.italic,
-                    fontSize: 30),
-              ),
+            const Text(
+              "Welcome back!",
+              style: TextStyle(
+                  fontFamily: "Karla-LightItalic",
+                  fontStyle: FontStyle.italic,
+                  fontSize: 30),
             ),
             const SizedBox(height: 50),
             Container(
-                margin: const EdgeInsets.symmetric(horizontal: 50),
-                width: 500,
-                child: TextField(
-                  controller: usernameController,
-                  decoration: InputDecoration(
-                    hintText: "Username",
-                    prefixIcon: const Icon(Icons.person),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    fillColor: Colors.deepPurple.withOpacity(0.30),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: Colors.black,
-                        width: 500,
-                      ),
+              margin: const EdgeInsets.symmetric(horizontal: 50),
+              width: 500,
+              child: TextField(
+                controller: usernameController,
+                decoration: InputDecoration(
+                  hintText: "Username",
+                  prefixIcon: const Icon(Icons.person),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  fillColor: Colors.deepPurple.withOpacity(0.30),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Colors.black,
+                      width: 500,
                     ),
                   ),
-                )),
-            const SizedBox(
-              height: 20,
+                ),
+              ),
             ),
+            const SizedBox(height: 20),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 50),
               width: 500,
@@ -193,37 +203,31 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ),
+            TextButton(
+              child: const Text("Forgot password?"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ForgotPassScreen()),
+                );
+              },
+            ),
             Container(
-              child: TextButton(
-                child: const Text("Forgot password?"),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ForgotPassScreen()),
-                  );
-                },
+              margin: const EdgeInsets.symmetric(horizontal: 50),
+              width: 200,
+              child: ElevatedButton(
+                onPressed: loginUser,
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  backgroundColor: Colors.deepPurple,
+                ),
+                child: const Text(
+                  'Log In',
+                  style: TextStyle(fontFamily: "Karla", color: Colors.white),
+                ),
               ),
             ),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 50),
-                width: 200,
-                child: ElevatedButton(
-                  onPressed: () {
-                    loginUser();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: Colors.deepPurple,
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontFamily: "Karla", color: Colors.white),
-                  ),
-                )),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
