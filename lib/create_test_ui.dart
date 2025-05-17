@@ -25,10 +25,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _topicController = TextEditingController();
   final TextEditingController _parametersController = TextEditingController();
-  int _titleCharCount = 0;
-  int _descriptionCharCount = 0;
-  final int _maxTitleLength = 255;
-  final int _maxDescriptionLength = 255;
   List<String> _questions = [];
   PlatformFile? _selectedFile;
   int? _selectedResourceId;
@@ -45,8 +41,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
   void initState() {
     super.initState();
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
-    _titleController.addListener(_updateTitleCharCount);
-    _descriptionController.addListener(_updateDescriptionCharCount);
     _initializeServerIP();
 
     if (widget.initialTestData != null) {
@@ -443,18 +437,6 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     super.dispose();
   }
 
-  void _updateTitleCharCount() {
-    setState(() {
-      _titleCharCount = _titleController.text.length;
-    });
-  }
-
-  void _updateDescriptionCharCount() {
-    setState(() {
-      _descriptionCharCount = _descriptionController.text.length;
-    });
-  }
-
   void _addQuestionForm() {
     setState(() {
       _questionFormData.add(_QuestionFormData(index: _questionFormData.length + 1));
@@ -811,26 +793,20 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
           children: [
             TextField(//Title
               controller: _titleController,
-              maxLength: _maxTitleLength,
               decoration: InputDecoration(
                 labelText: "Test Title",
                 hintText: "Enter the test title here",
                 border: const OutlineInputBorder(),
-                counterText: "$_titleCharCount/$_maxTitleLength",
-                counterStyle: const TextStyle(fontSize: 12),
               ),
             ),
             const SizedBox(height: 20),
             TextField(//Description
               controller: _descriptionController,
-              maxLength: _maxDescriptionLength,
               maxLines: 5,
               decoration: InputDecoration(
                 labelText: "Test Description",
                 hintText: "Enter the test description here",
                 border: const OutlineInputBorder(),
-                counterText: "$_descriptionCharCount/$_maxDescriptionLength",
-                counterStyle: const TextStyle(fontSize: 12),
               ),
             ),
             const SizedBox(height: 20),
@@ -940,12 +916,6 @@ class _QuestionFormData {
   TextEditingController questionTitleController = TextEditingController();
   TextEditingController questionDescriptionController = TextEditingController();
   TextEditingController questionAnswerController = TextEditingController();
-  int questionTitleCharCount = 0;
-  int questionDescriptionCharCount = 0;
-  int questionAnswerCharCount = 0;
-  final int maxQuestionTitleLength = 255;
-  final int maxQuestionDescriptionLength = 255;
-  final int maxQuestionAnswerLength = 255;
   int index;
   int? questionId;
   bool aiMade;
@@ -974,17 +944,14 @@ class _QuestionFormData {
   }
 
   void _updateTitleState() {
-    questionTitleCharCount = questionTitleController.text.length;
     _checkForEdits();
   }
 
   void _updateDescriptionState() {
-    questionDescriptionCharCount = questionDescriptionController.text.length;
     _checkForEdits();
   }
 
   void _updateAnswerState() {
-    questionAnswerCharCount = questionAnswerController.text.length;
     _checkForEdits();
   }
 
@@ -1032,11 +999,6 @@ class _QuestionFormData {
     questionTitleController.text = title;
     questionDescriptionController.text = description;
     questionAnswerController.text = answer;
-    
-    // Update character counts
-    questionTitleCharCount = title.length;
-    questionDescriptionCharCount = description.length;
-    questionAnswerCharCount = answer.length;
     
     // Set AI status
     aiMade = isAiMade;
@@ -1213,7 +1175,6 @@ class _QuestionFormState extends State<_QuestionForm> {
                       const SizedBox(height: 10),
                       TextField(
                         controller: question.questionTitleController,
-                        maxLength: question.maxQuestionTitleLength,
                         onChanged: (value) {
                           if (question.aiMade && !question._hasBeenEdited) {
                             setState(() {});
@@ -1224,15 +1185,11 @@ class _QuestionFormState extends State<_QuestionForm> {
                           hintText: "Enter the question title here",
                           border: const OutlineInputBorder(),
                           errorText: hasTitleError ? "Title is required" : null,
-                          counterText:
-                              "${question.questionTitleCharCount}/${question.maxQuestionTitleLength}",
-                          counterStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: question.questionDescriptionController,
-                        maxLength: question.maxQuestionDescriptionLength,
                         maxLines: 5,
                         onChanged: (value) {
                           if (question.aiMade && !question._hasBeenEdited) {
@@ -1243,15 +1200,11 @@ class _QuestionFormState extends State<_QuestionForm> {
                           labelText: "Question Description",
                           hintText: "Enter the question description here",
                           border: const OutlineInputBorder(),
-                          counterText:
-                              "${question.questionDescriptionCharCount}/${question.maxQuestionDescriptionLength}",
-                          counterStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: question.questionAnswerController,
-                        maxLength: question.maxQuestionAnswerLength,
                         maxLines: 5, 
                         minLines: 1,
                         onChanged: (value) {
@@ -1264,9 +1217,6 @@ class _QuestionFormState extends State<_QuestionForm> {
                           hintText: "Enter the answer here",
                           border: const OutlineInputBorder(),
                           errorText: hasAnswerError ? "Answer is required" : null,
-                          counterText:
-                              "${question.questionAnswerCharCount}/${question.maxQuestionAnswerLength}",
-                          counterStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
                     ],

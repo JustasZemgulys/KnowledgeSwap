@@ -25,7 +25,7 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
   late UserInfo user_info;
   String? serverIP;
   bool _isSubmitting = false;
-  int? _forumItemId; // For edit mode
+  int? _forumItemId;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -35,7 +35,6 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
     super.initState();
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     
-    // Initialize with existing data if in edit mode
     if (widget.isEditMode && widget.initialData != null) {
       _titleController.text = widget.initialData!['title'] ?? '';
       _descriptionController.text = widget.initialData!['description'] ?? '';
@@ -50,10 +49,28 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
       final getIP = GetIP();
       serverIP = await getIP.getUserIP();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error connecting to server: $e')),
-      );
+      _showErrorSnackBar('Failed to connect to server. Please try again later.');
     }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _submitDiscussion() async {
@@ -83,7 +100,8 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['success'] == true) {
-            Navigator.pop(context, true); // Return success to trigger refresh
+            _showSuccessSnackBar('Discussion ${widget.isEditMode ? 'updated' : 'created'} successfully!');
+            Navigator.pop(context, true);
           } else {
             throw Exception(data['message'] ?? 'Failed to ${widget.isEditMode ? 'update' : 'create'} discussion');
           }
@@ -91,9 +109,7 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
           throw Exception('Server returned status code ${response.statusCode}');
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        _showErrorSnackBar('Failed to ${widget.isEditMode ? 'update' : 'create'} discussion. Please try again.');
       } finally {
         setState(() => _isSubmitting = false);
       }

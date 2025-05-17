@@ -84,11 +84,11 @@ class AppRouter {
   }
 
   static void _logRoute(String message) {
-    debugPrint('[ROUTER] $message');
+    //debugPrint('[ROUTER] $message');
   }
 
   static void _logError(String message) {
-    debugPrint('[ROUTER ERROR] $message');
+    //debugPrint('[ROUTER ERROR] $message');
   }
 
   static Widget getScreenFromRoute(String routeName) {

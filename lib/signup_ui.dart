@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:knowledgeswap/main_screen_ui.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:provider/provider.dart';
@@ -25,47 +24,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String password = '';
   String name = '';
 
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> registerUser() async {
     if (passwordController.text.isEmpty ||
         nameController.text.isEmpty ||
         emailController.text.isEmpty ||
         repeatPasswordController.text.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text("Please fill all fields"),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text("OK"),
-              ),
-            ],
-          );
-        },
-      );
+      _showErrorSnackBar('Please fill all fields');
       return;
     }
 
     if (passwordController.text != repeatPasswordController.text) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text("Passwords do not match"),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text("OK"),
-              ),
-            ],
-          );
-        },
-      );
+      _showErrorSnackBar('Passwords do not match');
       return;
     }
 
@@ -91,33 +70,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (responseData['success']) {
           processRegistration(responseData['userData'], email);
         } else {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text(responseData['message']),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("OK"),
-                  ),
-                ],
-              );
-            },
-          );
+          _showErrorSnackBar(responseData['message'] ?? 'Registration failed');
         }
       } else {
-        print('Failed to check existing user: ${response.statusCode}');
+        _showErrorSnackBar('Server error occurred. Please try again.');
       }
     } catch (e) {
-      print('Error checking existing user: $e');
+      _showErrorSnackBar('Network error occurred. Please check your connection.');
     }
   }
 
-  Future<void> processRegistration(
-      dynamic userData, String recipientEmail) async {
+  Future<void> processRegistration(dynamic userData, String recipientEmail) async {
     String? verificationCode = await sendMail(recipientEmail, context);
 
     if (verificationCode != null) {
@@ -137,9 +100,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             }),
           );
 
-          print('Register Response: ${registerResponse.body}');
-
-          if (registerResponse.statusCode == 200) {
+          if (registerResponse.statusCode == 200 || registerResponse.statusCode == 201) {
             final registerData = jsonDecode(registerResponse.body);
             if (registerData['success']) {
               user_info = UserInfo.fromJson(registerData['userData']);
@@ -147,34 +108,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   Provider.of<UserInfoProvider>(context, listen: false);
               userInfoProvider.setUserInfo(user_info!);
               clearControllers();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MainScreen()),
+              
+              // Show success SnackBar
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(registerData['message'] ?? 'Registration successful!'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 3),
+                ),
               );
+              
+              // Wait for SnackBar to complete then navigate
+              await Future.delayed(const Duration(seconds: 3));
+              Navigator.popUntil(context, (route) => route.isFirst);
             } else {
-              print('Registration failed: ${registerData['message']}');
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text(registerData['message']),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: const Text("OK"),
-                      ),
-                    ],
-                  );
-                },
-              );
+              _showErrorSnackBar(registerData['message'] ?? 'Registration failed');
             }
           } else {
-            print('Failed to register user: ${registerResponse.statusCode}');
+            _showErrorSnackBar('Server error occurred during registration');
           }
         } catch (e) {
-          print('Error registering user: $e');
+          _showErrorSnackBar('Error during registration. Please try again.');
         }
       }
     }
@@ -198,15 +152,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (responseData['success']) {
           return responseData['verificationCode'];
         } else {
-          print('Failed to send email: ${responseData['message']}');
+          _showErrorSnackBar(responseData['message'] ?? 'Failed to send verification email');
           return null;
         }
       } else {
-        print('Failed to send email: ${response.statusCode}');
+        _showErrorSnackBar('Failed to send verification email');
         return null;
       }
     } catch (e) {
-      print('Error sending email: $e');
+      _showErrorSnackBar('Network error while sending verification email');
       return null;
     }
   }
@@ -231,27 +185,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
               onPressed: () {
                 if (codeController.text == correctCode) {
                   verified = true;
-                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context);
                 } else {
-                  // Show error message
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text("Invalid Code"),
-                        content: const Text(
-                            "Please enter the correct verification code."),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: const Text("OK"),
-                          ),
-                        ],
-                      );
-                    },
-                  );
+                  _showErrorSnackBar('Invalid verification code');
                 }
               },
             ),
@@ -306,13 +242,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
                           color: Colors.black,
-                          width: 500), // Adjust the width here
+                          width: 500),
                     ),
                   ),
                 )),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Container(
                 margin: const EdgeInsets.symmetric(horizontal: 50),
                 width: 250,
@@ -327,13 +261,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
                           color: Colors.black,
-                          width: 500), // Adjust the width here
+                          width: 500),
                     ),
                   ),
                 )),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 50),
               width: 250,
@@ -350,14 +282,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     borderSide: const BorderSide(
                       color: Colors.black,
                       width: 500,
-                    ), // Adjust the width here
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Container(
                 margin: const EdgeInsets.symmetric(horizontal: 50),
                 width: 250,
@@ -373,16 +303,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
                           color: Colors.black,
-                          width: 500), // Adjust the width here
+                          width: 500),
                     ),
                   ),
                 )),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Container(
                 margin: const EdgeInsets.symmetric(horizontal: 50),
-                //padding: EdgeInsets.only(bottom: 100),
                 width: 200,
                 child: ElevatedButton(
                   onPressed: () {
@@ -397,9 +324,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     style: TextStyle(fontFamily: "Karla", color: Colors.white),
                   ),
                 )),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

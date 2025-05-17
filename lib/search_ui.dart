@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/discussion_ui.dart';
+import 'package:knowledgeswap/edit_forum_ui.dart';
 import 'package:knowledgeswap/edit_group_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
+import 'package:knowledgeswap/forum_details_screen.dart';
 import 'package:knowledgeswap/profile_details_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
 import 'package:knowledgeswap/voting_system.dart';
@@ -159,7 +161,9 @@ class _SearchScreenState extends State<SearchScreen> {
     final itemId = item['id'];
     final isPrivate = item['visibility'] == 0;
     final score = item['score'] ?? 0;
-    final userVote = item['user_vote']; // 1 for upvote, -1 for downvote, null for no vote
+    final userVote = item['user_vote'];
+    
+    // Use title for forum items
     if(isForumItem) item['name'] = item['title'];
 
     return Card(
@@ -181,7 +185,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   onPressed: () {
                     VotingController(
                       context: context,
-                      itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
+                      itemType: isForumItem ? 'forum_item' : (isGroup ? 'group' : (isTest ? 'test' : 'resource')),
                       itemId: itemId,
                       currentScore: score,
                       onScoreUpdated: (newScore) {
@@ -208,7 +212,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   onPressed: () {
                     VotingController(
                       context: context,
-                      itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
+                      itemType: isForumItem ? 'forum_item' : (isGroup ? 'group' : (isTest ? 'test' : 'resource')),
                       itemId: itemId,
                       currentScore: score,
                       onScoreUpdated: (newScore) {
@@ -232,125 +236,157 @@ class _SearchScreenState extends State<SearchScreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${isGroup ? 'Group' : (isTest ? 'Test' : (isForumItem ? 'Forum Post' : 'Resource'))} '),
-
+                  Text('${isGroup ? 'Group' : (isTest ? 'Test' : (isForumItem ? 'Forum Post' : 'Resource'))}'),
                   Text('By: ${item['creator_name'] ?? 'Unknown'}'),
                   if (isPrivate) Text('Private', style: TextStyle(color: Colors.grey)),
                   if (isGroup) Text('${item['member_count'] ?? 0} members', style: TextStyle(color: Colors.grey)),
-                  //if (isForumItem && item['description'] != null) Text(item['description']),
-                ],
-              ),
-              trailing: PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                itemBuilder: (context) => [
-                  if (isTest)
-                    const PopupMenuItem(
-                      value: 'take_test',
-                      child: Text('Take Test'),
-                    ),
-                  if (!isTest && !isGroup)
-                    const PopupMenuItem(
-                      value: 'download',
-                      child: Text('Download'),
-                    ),
-                  const PopupMenuItem(
-                    value: 'discussions',
-                    child: ListTile(
-                      leading: Icon(Icons.forum, size: 20),
-                      title: Text('View Discussions', style: TextStyle(fontSize: 14)),
-                    ),
-                  ),
-                  if (isGroup && item['is_member'] == true)
-                    const PopupMenuItem(
-                      value: 'group_discussions',
-                      child: ListTile(
-                        leading: Icon(Icons.forum, size: 20),
-                        title: Text('Group Chat', style: TextStyle(fontSize: 14)),
-                      ),
-                    ),
-                  if (isOwner) ...[
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Delete', style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                  if (isGroup && !item['is_member'] && !isOwner)
-                    const PopupMenuItem(
-                      value: 'join_group',
-                      child: Text('Join Group'),
-                    ),
-                  if (isGroup && item['is_member'] && !isOwner)
-                    const PopupMenuItem(
-                      value: 'leave_group',
-                      child: Text('Leave Group', style: TextStyle(color: Colors.red)),
+                  if (isForumItem && item['description'] != null) 
+                    Text(
+                      item['description'],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
-                onSelected: (value) async {
-                  if (value == 'take_test') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TakeTestScreen(testId: itemId),
-                      ),
-                    );
-                  } else if (value == 'download') {
-                    await _downloadResource(item);
-                  } else if (value == 'edit') {
-                    if (isTest) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditTestScreen(test: item),
-                        ),
-                      ).then((_) => _performSearch());
-                    } else if (isGroup) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditGroupScreen(group: item),
-                        ),
-                      ).then((_) => _performSearch());
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditResourceScreen(resource: item),
-                        ),
-                      ).then((_) => _performSearch());
-                    }
-                  } else if (value == 'delete') {
-                    _confirmDeleteItem(context, itemId, item['name'], isTest, isGroup);
-                  } else if (value == 'discussions') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DiscussionScreen(
-                          itemId: itemId,
-                          itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
-                        ),
-                      ),
-                    );
-                  } else if (value == 'group_discussions') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DiscussionScreen(
-                          itemId: itemId * -1,
-                          itemType: 'group',
-                        ),
-                      ),
-                    );
-                  } else if (value == 'join_group') {
-                    await _joinGroup(itemId);
-                  } else if (value == 'leave_group') {
-                    await _leaveGroup(itemId);
-                  }
-                },
               ),
+              trailing: isForumItem 
+                  ? isOwner 
+                      ? PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditForumScreen(forumItem: item),
+                                ),
+                              ).then((_) => _performSearch());
+                            } else if (value == 'delete') {
+                              _confirmDeleteItem(context, itemId, item['title'], false, false, true);
+                            }
+                          },
+                        )
+                      : null
+                  : PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      itemBuilder: (context) => [
+                        if (isTest)
+                          const PopupMenuItem(
+                            value: 'take_test',
+                            child: Text('Take Test'),
+                          ),
+                        if (!isTest && !isGroup)
+                          const PopupMenuItem(
+                            value: 'download',
+                            child: Text('Download'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'discussions',
+                          child: ListTile(
+                            leading: Icon(Icons.forum, size: 20),
+                            title: Text('View Discussions', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        if (isGroup && item['is_member'] == true)
+                          const PopupMenuItem(
+                            value: 'group_discussions',
+                            child: ListTile(
+                              leading: Icon(Icons.forum, size: 20),
+                              title: Text('Group Chat', style: TextStyle(fontSize: 14)),
+                            ),
+                          ),
+                        if (isOwner) ...[
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                        if (isGroup && !item['is_member'] && !isOwner)
+                          const PopupMenuItem(
+                            value: 'join_group',
+                            child: Text('Join Group'),
+                          ),
+                        if (isGroup && item['is_member'] && !isOwner)
+                          const PopupMenuItem(
+                            value: 'leave_group',
+                            child: Text('Leave Group', style: TextStyle(color: Colors.red)),
+                          ),
+                      ],
+                      onSelected: (value) async {
+                        if (value == 'take_test') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TakeTestScreen(testId: itemId),
+                            ),
+                          );
+                        } else if (value == 'download') {
+                          await _downloadResource(item);
+                        } else if (value == 'edit') {
+                          if (isTest) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditTestScreen(test: item),
+                              ),
+                            ).then((_) => _performSearch());
+                          } else if (isGroup) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditGroupScreen(group: item),
+                              ),
+                            ).then((_) => _performSearch());
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditResourceScreen(resource: item),
+                              ),
+                            ).then((_) => _performSearch());
+                          }
+                        } else if (value == 'delete') {
+                          _confirmDeleteItem(context, itemId, item['name'], isTest, isGroup, false);
+                        } else if (value == 'discussions') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DiscussionScreen(
+                                itemId: itemId,
+                                itemType: isGroup ? 'group' : (isTest ? 'test' : 'resource'),
+                              ),
+                            ),
+                          );
+                        } else if (value == 'group_discussions') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DiscussionScreen(
+                                itemId: itemId * -1,
+                                itemType: 'group',
+                              ),
+                            ),
+                          );
+                        } else if (value == 'join_group') {
+                          await _joinGroup(itemId);
+                        } else if (value == 'leave_group') {
+                          await _leaveGroup(itemId);
+                        }
+                      },
+                    ),
               onTap: () {
                 if (isTest) {
                   Navigator.push(
@@ -366,6 +402,16 @@ class _SearchScreenState extends State<SearchScreen> {
                       builder: (context) => GroupDetailScreen(
                         groupId: itemId,
                         groupName: item['name'],
+                      ),
+                    ),
+                  );
+                } else if (isForumItem) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ForumDetailsScreen(
+                        forumItemId: itemId,
+                        hasTest: item['fk_test'] != null,
                       ),
                     ),
                   );
@@ -442,11 +488,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _confirmDeleteItem(BuildContext context, int itemId, String itemName, bool isTest, bool isGroup) async {
+  Future<void> _confirmDeleteItem(BuildContext context, int itemId, String itemName, bool isTest, bool isGroup, bool isForumItem) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete ${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')}'),
+        title: Text('Delete ${isForumItem ? 'Forum Post' : (isGroup ? 'Group' : (isTest ? 'Test' : 'Resource'))}'),
         content: Text('Are you sure you want to delete "$itemName"?'),
         actions: [
           TextButton(
@@ -462,16 +508,19 @@ class _SearchScreenState extends State<SearchScreen> {
     );
 
     if (confirmed == true) {
-      await _deleteItem(itemId, isTest, isGroup);
+      await _deleteItem(itemId, isTest, isGroup, isForumItem);
     }
   }
 
-  Future<void> _deleteItem(int itemId, bool isTest, bool isGroup) async {
+  Future<void> _deleteItem(int itemId, bool isTest, bool isGroup, bool isForumItem) async {
     try {
       String endpoint;
       String idField;
       
-      if (isGroup) {
+      if (isForumItem) {
+        endpoint = 'delete_forum_item.php';
+        idField = 'forum_item_id';
+      } else if (isGroup) {
         endpoint = 'delete_group.php';
         idField = 'group_id';
       } else {
@@ -492,17 +541,17 @@ class _SearchScreenState extends State<SearchScreen> {
       
       if (responseData['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${isGroup ? 'Group' : (isTest ? 'Test' : 'Resource')} deleted successfully')),
+          SnackBar(content: Text('${isForumItem ? 'Forum post' : (isGroup ? 'Group' : (isTest ? 'Test' : 'Resource'))} deleted successfully')),
         );
         _performSearch();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete ${isGroup ? 'group' : (isTest ? 'test' : 'resource')}')),
+          SnackBar(content: Text(responseData['message'] ?? 'Failed to delete ${isForumItem ? 'forum post' : (isGroup ? 'group' : (isTest ? 'test' : 'resource'))}')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting ${isGroup ? 'group' : (isTest ? 'test' : 'resource')}: $e')),
+        SnackBar(content: Text('Error deleting ${isForumItem ? 'forum post' : (isGroup ? 'group' : (isTest ? 'test' : 'resource'))}: $e')),
       );
     }
   }

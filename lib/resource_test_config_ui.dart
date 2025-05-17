@@ -23,6 +23,7 @@ class ResourceTestConfigScreen extends StatefulWidget {
 class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   final List<Map<String, TextEditingController>> _questions = [];
   final TextEditingController _replaceTopicsController = TextEditingController();
+  final TextEditingController _replaceParamsController = TextEditingController();
   bool _isGenerating = false;
   final int _maxQuestions = 20;
   late UserInfo userInfo;
@@ -60,7 +61,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   void _addQuestion({String topic = '', String parameters = ''}) {
     if (_questions.length >= _maxQuestions) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Maximum of $_maxQuestions questions reached')),
+        const SnackBar(content: Text('Maximum of 20 questions reached')),
       );
       return;
     }
@@ -76,13 +77,20 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   void _cloneQuestion(int index) {
     if (_questions.length >= _maxQuestions) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Maximum of $_maxQuestions questions reached')),
+        const SnackBar(content: Text('Maximum of 20 questions reached')),
+      );
+      return;
+    }
+
+    final questionToClone = _questions[index];
+    if (questionToClone['topic']!.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot clone a question with empty topic')),
       );
       return;
     }
 
     setState(() {
-      final questionToClone = _questions[index];
       _questions.insert(index + 1, {
         'topic': TextEditingController(text: questionToClone['topic']!.text),
         'parameters': TextEditingController(text: questionToClone['parameters']!.text),
@@ -99,7 +107,8 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
   }
 
   void _replaceAllTopics() {
-    if (_replaceTopicsController.text.isEmpty) {
+    final newTopic = _replaceTopicsController.text.trim();
+    if (newTopic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter text to replace topics')),
       );
@@ -108,34 +117,49 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
 
     setState(() {
       for (var question in _questions) {
-        question['topic']!.text = _replaceTopicsController.text;
+        question['topic']!.text = newTopic;
       }
     });
     _replaceTopicsController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
+  void _replaceAllParameters() {
+    final newParams = _replaceParamsController.text.trim();
+    // Parameters can be empty, so no validation here
+
+    setState(() {
+      for (var question in _questions) {
+        question['parameters']!.text = newParams;
+      }
+    });
+    _replaceParamsController.clear();
+    FocusScope.of(context).unfocus();
   }
 
   Future<void> _generateTest() async {
     if (_isGenerating) return;
     
+    // Validate all topics (parameters can be empty)
+    for (var i = 0; i < _questions.length; i++) {
+      final question = _questions[i];
+      if (question['topic']!.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Question ${i + 1} has an empty topic')),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _isGenerating = true;
     });
 
     try {
-      final questions = _questions
-          .where((q) => q['topic']!.text.isNotEmpty && q['parameters']!.text.isNotEmpty)
-          .map((q) => {
-                'topic': q['topic']!.text,
-                'parameters': q['parameters']!.text,
-              })
-          .toList();
-
-      if (questions.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please add at least one valid question')),
-        );
-        return;
-      }
+      final questions = _questions.map((q) => {
+            'topic': q['topic']!.text.trim(),
+            'parameters': q['parameters']!.text.trim(), // Can be empty
+          }).toList();
 
       await ResourceTestGenerator.generateTest(
         context: context,
@@ -160,6 +184,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
       question['parameters']!.dispose();
     }
     _replaceTopicsController.dispose();
+    _replaceParamsController.dispose();
     super.dispose();
   }
 
@@ -183,6 +208,7 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Replace Topics Section
             Row(
               children: [
                 Expanded(
@@ -198,14 +224,41 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  '${_questions.length}/$_maxQuestions',
-                  style: const TextStyle(fontSize: 16),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Replace Parameters Section
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _replaceParamsController,
+                    decoration: InputDecoration(
+                      labelText: 'Replace all parameters with',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: _replaceAllParameters,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
+            
+            // Question Counter
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${_questions.length}/$_maxQuestions',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Questions List
             ..._questions.asMap().entries.map((entry) {
               final index = entry.key;
               final question = entry.value;
@@ -233,16 +286,20 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
                       TextField(
                         controller: question['topic'],
                         decoration: InputDecoration(
-                          labelText: 'Topic',
+                          labelText: 'Topic*',
                           hintText: 'e.g. ${widget.resourceName}',
                           border: const OutlineInputBorder(),
+                          errorText: question['topic']!.text.trim().isEmpty ? 'Required' : null,
                         ),
+                        onChanged: (value) {
+                          setState(() {}); // Trigger rebuild to show/hide error
+                        },
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: question['parameters'],
                         decoration: const InputDecoration(
-                          labelText: 'Parameters',
+                          labelText: 'Parameters (optional)',
                           hintText: 'e.g. easy multiple choice about verbs',
                           border: OutlineInputBorder(),
                         ),
@@ -254,12 +311,14 @@ class _ResourceTestConfigScreenState extends State<ResourceTestConfigScreen> {
               );
             }),
             const SizedBox(height: 10),
+            
+            // Action Buttons
             Row(
               children: [
                 ElevatedButton(
                   onPressed: () => _addQuestion(
                     topic: widget.resourceName,
-                    parameters: 'multiple choice',
+                    parameters: '', // Empty parameters by default
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,

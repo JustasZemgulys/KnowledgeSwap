@@ -22,15 +22,30 @@ Future<String?> sendMail(String recipientEmail, BuildContext context) async {
       if (responseData['success']) {
         return responseData['verificationCode'];
       } else {
-        //print('Failed to send email: ${responseData['message']}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(responseData['message'] ?? 'Failed to send email'),
+            backgroundColor: Colors.red,
+          ),
+        );
         return null;
       }
     } else {
-      //print('Failed to send email: ${response.statusCode}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Server error occurred while sending email'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return null;
     }
   } catch (e) {
-    //print('Error sending email: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Network error occurred. Please check your connection.'),
+        backgroundColor: Colors.red,
+      ),
+    );
     return null;
   }
 }
@@ -48,7 +63,7 @@ class _ForgotPassScreenState extends State<ForgotPassScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Forgot Password')),
+      appBar: AppBar(title: const Text('Forgot Password')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -56,17 +71,25 @@ class _ForgotPassScreenState extends State<ForgotPassScreen> {
           children: [
             TextField(
               controller: emailController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Enter Email',
                 prefixIcon: Icon(Icons.email),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                //generatedCode = generateRandomCode();
-                // ignore: non_constant_identifier_names
-                String? EmailVerification =
+                if (emailController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter your email address'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                final String? EmailVerification = 
                     await sendMail(emailController.text, context);
 
                 if (EmailVerification != null) {
@@ -75,20 +98,13 @@ class _ForgotPassScreenState extends State<ForgotPassScreen> {
                     MaterialPageRoute(
                       builder: (context) => CodeConfirmationScreen(
                         generatedCode: EmailVerification,
-                        email: emailController
-                            .text, // Pass the email to CodeConfirmationScreen
+                        email: emailController.text,
                       ),
                     ),
                   );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(
-                            'Failed to send verification code. Please try again!')),
-                  );
                 }
               },
-              child: Text('Send Verification Code'),
+              child: const Text('Send Verification Code'),
             ),
           ],
         ),
@@ -107,7 +123,7 @@ class CodeConfirmationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Enter Verification Code')),
+      appBar: AppBar(title: const Text('Enter Verification Code')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -115,14 +131,25 @@ class CodeConfirmationScreen extends StatelessWidget {
           children: [
             TextField(
               controller: codeController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Enter Verification Code',
                 prefixIcon: Icon(Icons.code),
               ),
+              keyboardType: TextInputType.number,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
+                if (codeController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter the verification code'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
                 if (codeController.text == generatedCode) {
                   Navigator.push(
                     context,
@@ -132,11 +159,14 @@ class CodeConfirmationScreen extends StatelessWidget {
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Invalid code. Try again!')),
+                    const SnackBar(
+                      content: Text('Invalid code. Please try again!'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               },
-              child: Text('Verify Code'),
+              child: const Text('Verify Code'),
             ),
           ],
         ),
@@ -147,59 +177,88 @@ class CodeConfirmationScreen extends StatelessWidget {
 
 class ChangePasswordScreen extends StatefulWidget {
   final String email;
-  ChangePasswordScreen({required this.email});
+  const ChangePasswordScreen({required this.email});
+  
   @override
-  _ChangePasswordScreenState createState() =>
-      _ChangePasswordScreenState(email: email);
+  _ChangePasswordScreenState createState() => _ChangePasswordScreenState();
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   TextEditingController newPasswordController = TextEditingController();
-  final String email;
-
-  _ChangePasswordScreenState({required this.email});
+  TextEditingController confirmPasswordController = TextEditingController();
 
   Future<void> changePassword(String email, String newPassword) async {
+    if (newPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a new password'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (newPasswordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final getIP = GetIP();
     String userIP = await getIP.getUserIP();
     final String apiUrl = '$userIP/change_password.php';
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(<String, String>{
-        'email': email,
-        'newPassword': newPassword,
-      }),
-    );
+    
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, String>{
+          'email': email,
+          'newPassword': newPassword,
+        }),
+      );
 
-    // Print the response body for debugging
-    print('Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      try {
+      if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
         if (responseData['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Password changed successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const LoginPage()),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(responseData['message'])),
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Failed to change password'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
-      } catch (e) {
-        print('Error parsing JSON response: $e');
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error parsing server response')),
+          const SnackBar(
+            content: Text('Server error occurred. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-    } else {
-      print('Error: ${response.statusCode}');
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to change password')),
+        const SnackBar(
+          content: Text('Network error occurred. Please check your connection.'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -207,7 +266,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Change Password')),
+      appBar: AppBar(title: const Text('Change Password')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -215,19 +274,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           children: [
             TextField(
               controller: newPasswordController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Enter New Password',
                 prefixIcon: Icon(Icons.lock),
                 border: OutlineInputBorder(),
               ),
-              obscureText: true, // Hides the entered text
+              obscureText: true,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
+            TextField(
+              controller: confirmPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Confirm New Password',
+                prefixIcon: Icon(Icons.lock),
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                changePassword(email, newPasswordController.text);
+                changePassword(widget.email, newPasswordController.text);
               },
-              child: Text('Change Password'),
+              child: const Text('Change Password'),
             ),
           ],
         ),

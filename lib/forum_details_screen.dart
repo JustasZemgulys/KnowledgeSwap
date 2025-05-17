@@ -44,6 +44,26 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     _initializeServerIP();
   }
 
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _initializeServerIP() async {
     try {
       final getIP = GetIP();
@@ -54,7 +74,7 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
       }
       await _fetchComments();
     } catch (e) {
-      _showError('Connection error: $e');
+      _showErrorSnackBar('Failed to connect to server. Please try again.');
     } finally {
       setState(() => isLoading = false);
     }
@@ -68,9 +88,11 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() => forumItem = data['item']);
+      } else {
+        _showErrorSnackBar('Failed to load forum item. Please try again.');
       }
     } catch (e) {
-      _showError('Failed to load forum item');
+      _showErrorSnackBar('Network error occurred. Please check your connection.');
     }
   }
 
@@ -85,9 +107,11 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
           testDetails = data['test'];
           userAnswers = data['answers'];
         });
+      } else {
+        _showErrorSnackBar('Failed to load test details. Please try again.');
       }
     } catch (e) {
-      _showError('Failed to load test details: $e');
+      _showErrorSnackBar('Network error occurred while loading test details.');
     }
   }
 
@@ -99,9 +123,11 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() => comments = data['comments'] ?? []);
+      } else {
+        _showErrorSnackBar('Failed to load comments. Please try again.');
       }
     } catch (e) {
-      _showError('Failed to load comments');
+      _showErrorSnackBar('Network error occurred while loading comments.');
     }
   }
 
@@ -116,7 +142,8 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     );
     
     if (result == true) {
-      await _fetchForumItem(); // Refresh the item
+      _showSuccessSnackBar('Forum item updated successfully');
+      await _fetchForumItem();
     }
   }
 
@@ -152,16 +179,14 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['success'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Forum item deleted successfully')),
-            );
-            Navigator.pop(context); // Close the details screen
+            _showSuccessSnackBar('Forum item deleted successfully');
+            Navigator.pop(context);
+          } else {
+            _showErrorSnackBar(data['message'] ?? 'Failed to delete forum item');
           }
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        _showErrorSnackBar('Network error occurred. Please try again.');
       }
     }
   }
@@ -169,9 +194,13 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
   Future<void> _postComment() async {
     String commentText = _commentController.text.trim();
     
-    if (commentText.isEmpty) return;
+    if (commentText.isEmpty) {
+      _showErrorSnackBar('Comment cannot be empty');
+      return;
+    }
+    
     if (commentText.length > _maxCommentLength) {
-      _showError('Comment too long');
+      _showErrorSnackBar('Comment exceeds maximum length of $_maxCommentLength characters');
       return;
     }
 
@@ -194,10 +223,13 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
           replyingToCommentId = null;
           replyingToUsername = null;
         });
+        _showSuccessSnackBar('Comment posted successfully');
         await _fetchComments();
+      } else {
+        _showErrorSnackBar('Failed to post comment. Please try again.');
       }
     } catch (e) {
-      _showError('Failed to post comment');
+      _showErrorSnackBar('Network error occurred. Please try again.');
     }
   }
 
@@ -215,88 +247,116 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     });
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 3))
-    );
+  String _getParentCommentName(int parentId) {
+    try {
+      for (var comment in comments) {
+        if (comment['id'] == parentId) {
+          return comment['name'];
+        }
+      }
+      return '[deleted]';
+    } catch (e) {
+      return '[deleted]';
+    }
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateString;
+    }
   }
 
   Widget _buildTestReviewSection() {
-  if (!widget.hasTest || testDetails == null || testDetails!['questions'] == null) {
-    return const SizedBox();
-  }
+    if (!widget.hasTest || testDetails == null || testDetails!['questions'] == null) {
+      return const SizedBox();
+    }
 
-  final questions = testDetails!['questions'] as List;
-  // ignore: unnecessary_cast
-  final answers = userAnswers as List? ?? [];
+    final questions = testDetails!['questions'] as List;
+    final answers = userAnswers ?? [];
 
-  return ExpansionPanelList(
-    expansionCallback: (int index, bool isExpanded) {
-      setState(() => isTestExpanded = !isTestExpanded);
-    },
-    children: [
-      ExpansionPanel(
-        headerBuilder: (BuildContext context, bool isExpanded) {
-          return ListTile(
-            title: Text(
-              'Test Review - ${testDetails!['name'] ?? 'Test'}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          );
-        },
-        body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              ...List.generate(questions.length, (index) {
-                // Safely get question and answer
-                final question = index < questions.length ? questions[index] : null;
-                final answer = index < answers.length ? answers[index] : null;
-                
-                if (question == null) return const SizedBox();
+    return ExpansionPanelList(
+      expansionCallback: (int index, bool isExpanded) {
+        setState(() => isTestExpanded = !isTestExpanded);
+      },
+      children: [
+        ExpansionPanel(
+          headerBuilder: (BuildContext context, bool isExpanded) {
+            return ListTile(
+              title: Text(
+                'Test Review - ${testDetails!['name'] ?? 'Test'}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            );
+          },
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                ...List.generate(questions.length, (index) {
+                  final question = index < questions.length ? questions[index] : null;
+                  final answer = index < answers.length ? answers[index] : null;
+                  
+                  if (question == null) return const SizedBox();
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Question ${index + 1}: ${question['text']}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      if (question['description'] != null && question['description'].isNotEmpty) ...[
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'Question description: ${question['description']}',
+                          'Question ${index + 1}: ${question['text']}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (question['description'] != null && question['description'].isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Description: ${question['description']}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'User answer: ${answer?['answer'] ?? 'Not answered'}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 8),
+                        Text(
+                          'Correct answer: ${question['correct_answer']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 1,
+                          color: Colors.grey[300],
+                        ),
                       ],
-                      Text('User answer: ${answer?['answer'] ?? 'Not answered'}'),
-                      Text('Question answer: ${question['correct_answer']}'),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 1,
-                        color: Colors.grey[300],
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
+          isExpanded: isTestExpanded,
         ),
-        isExpanded: isTestExpanded,
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _buildCommentItem(dynamic comment) {
     final isAuthor = comment['fk_user'] == userInfo.id;
@@ -390,18 +450,24 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
                           itemBuilder: (context) => [
                             const PopupMenuItem(
                               value: 'edit',
-                              child: Text('Edit'),
+                              child: ListTile(
+                                leading: Icon(Icons.edit, size: 20),
+                                title: Text('Edit', style: TextStyle(fontSize: 14)),
+                              ),
                             ),
                             const PopupMenuItem(
                               value: 'delete',
-                              child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              child: ListTile(
+                                leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                                title: Text('Delete', style: TextStyle(fontSize: 14, color: Colors.red)),
+                              ),
                             ),
                           ],
-                          onSelected: (value) {
+                          onSelected: (value) async {
                             if (value == 'edit') {
-                              // Implement edit functionality
+                              await _editComment(comment['id'], text);
                             } else if (value == 'delete') {
-                              // Implement delete functionality
+                              await _deleteComment(comment['id']);
                             }
                           },
                         ),
@@ -435,25 +501,129 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     );
   }
 
-  String _getParentCommentName(int parentId) {
-    try {
-      for (var comment in comments) {
-        if (comment['id'] == parentId) {
-          return comment['name'];
+  Future<void> _editComment(int commentId, String currentText) async {
+    final comment = comments.firstWhere((c) => c['id'] == commentId);
+    if (comment['is_deleted'] == true) {
+      _showErrorSnackBar('Cannot edit deleted comments');
+      return;
+    }
+
+    final textController = TextEditingController(text: currentText);
+    
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Comment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: textController,
+              maxLines: 5,
+              maxLength: _maxCommentLength,
+              autofocus: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (textController.text.length <= _maxCommentLength) {
+                Navigator.pop(context, textController.text);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (newText != null && newText.trim() != currentText.trim()) {
+      // Optimistic update
+      setState(() {
+        final index = comments.indexWhere((c) => c['id'] == commentId);
+        if (index != -1) {
+          comments[index]['text'] = newText.trim();
+          comments[index]['is_edited'] = true;
+          comments[index]['last_edit_date'] = DateTime.now().toString();
         }
+      });
+
+      try {
+        final response = await http.post(
+          Uri.parse('$serverIP/update_comment.php'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'comment_id': commentId,
+            'user_id': userInfo.id,
+            'text': newText.trim(),
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          await _fetchComments();
+          _showErrorSnackBar('Failed to update comment');
+        }
+      } catch (e) {
+        await _fetchComments();
+        _showErrorSnackBar('Failed to update comment');
       }
-      return '[deleted]';
-    } catch (e) {
-      return '[deleted]';
     }
   }
 
-  String _formatDate(String dateString) {
+  Future<void> _deleteComment(int commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
-      final date = DateTime.parse(dateString);
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      // Optimistic update
+      setState(() {
+        final index = comments.indexWhere((c) => c['id'] == commentId);
+        if (index != -1) {
+          comments[index]['is_deleted'] = 1;
+          comments[index]['text'] = '[deleted]';
+        }
+      });
+
+      final response = await http.post(
+        Uri.parse('$serverIP/delete_comment.php'),
+        body: {
+          'comment_id': commentId.toString(),
+          'user_id': userInfo.id.toString(),
+        },
+      );
+
+      if (response.statusCode != 200) {
+        await _fetchComments();
+        _showErrorSnackBar('Failed to delete comment');
+      }
     } catch (e) {
-      return dateString;
+      await _fetchComments();
+      _showErrorSnackBar('Failed to delete comment');
     }
   }
 
@@ -475,7 +645,7 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
         scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        iconTheme: IconThemeData(color: Colors.deepPurple),
+        iconTheme: const IconThemeData(color: Colors.deepPurple),
         actions: [
           if (forumItem != null && forumItem!['fk_user'] == userInfo.id)
             PopupMenuButton<String>(
@@ -517,7 +687,6 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Forum item details
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -540,11 +709,9 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
                   ),
                   const Divider(),
 
-                  // Test review section (if has test)
                   _buildTestReviewSection(),
                   const Divider(),
 
-                  // Comments section
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
@@ -558,7 +725,6 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
             ),
           ),
 
-          // Comment form (reused from DiscussionScreen)
           Container(
             padding: const EdgeInsets.all(16.0),
             child: Column(

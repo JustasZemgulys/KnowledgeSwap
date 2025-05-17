@@ -10,6 +10,8 @@ class GetIP {
       final data = json.decode(response.body);
       final ip = data['ip'];
       return "http://$ip";
+      //return "https://juszem1-1.stud.if.ktu.lt";
+      //return "https://192.168.138.92";
     } else {
       throw Exception('Failed to load IP');
     }

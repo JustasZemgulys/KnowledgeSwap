@@ -1,6 +1,5 @@
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:knowledgeswap/main.dart';
 import 'package:provider/provider.dart';
 import 'package:knowledgeswap/welcome.dart';
 import 'dart:convert';
@@ -26,8 +25,6 @@ class _SettingScreenState extends State<SettingScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Retrieve user information from the provider
     user_info = Provider.of<UserInfoProvider>(context, listen: false).userInfo!;
     initializeControllers();
   }
@@ -37,41 +34,47 @@ class _SettingScreenState extends State<SettingScreen> {
     emailController.text = user_info.email;
   }
 
-  void saveUserInfo() async {
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> saveUserInfo() async {
     final getIP = GetIP();
     final userIP = await getIP.getUserIP();
     final apiUrl = '$userIP/settings.php';
 
-    // Get the updated user information
     String newName = nameController.text;
     String newEmail = emailController.text;
     String newPassword = passNewController.text;
     String oldPassword = passController.text;
     String repeatedPassword = passRepeatController.text;
 
-    // Validate the input
-    if (newPassword.isNotEmpty && newPassword != repeatedPassword) {
-      // Show an error message if new password and repeated password don't match
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text("Passwords don't match"),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text("OK"),
-              ),
-            ],
-          );
-        },
-      );
+    if (oldPassword.isEmpty) {
+      _showErrorSnackBar('Please enter your current password');
       return;
     }
 
-    // Prepare the data for the POST request
+    if (newPassword.isNotEmpty && newPassword != repeatedPassword) {
+      _showErrorSnackBar('New passwords do not match');
+      return;
+    }
+
     Map<String, dynamic> requestData = {
       'id': user_info.id,
       'newName': newName,
@@ -90,89 +93,33 @@ class _SettingScreenState extends State<SettingScreen> {
       final responseData = jsonDecode(response.body);
 
       if (responseData['success']) {
-        // Update the user_info with the new information
         user_info = UserInfo.fromJson(responseData['userData']);
         Provider.of<UserInfoProvider>(context, listen: false)
             .setUserInfo(user_info);
-
-        // Show a success message
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text("User info updated successfully"),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text("OK"),
-                ),
-              ],
-            );
-          },
-        );
+        _showSuccessSnackBar('Profile updated successfully');
       } else {
-        // Show a failure message
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text("Update Failed"),
-              content: Text(responseData['message']),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text("OK"),
-                ),
-              ],
-            );
-          },
-        );
+        _showErrorSnackBar(responseData['message'] ?? 'Failed to update profile');
       }
     } catch (e) {
-      print('Error: $e');
+      _showErrorSnackBar('Network error. Please try again.');
     }
   }
 
   Future<void> disconnectUser() async {
-    // Clear user info and storage
-    await Provider.of<UserInfoProvider>(context, listen: false).clearUserInfo();
-    
-    // Clear navigation stack and go to welcome screen
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-      (route) => false,
-    );
-    
-    // Force rebuild the entire app
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const KnowledgeSwapApp()),
-      );
-    }
-  }
-
-  void deleteAccount() async {
     bool confirm = await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Are you sure you want to delete your account?"),
+          title: const Text("Confirm Logout"),
+          content: const Text("Are you sure you want to logout?"),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false); // No, do not delete
-              },
-              child: const Text("No"),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancel"),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(true); // Yes, delete
-              },
-              child: const Text("Yes"),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Logout"),
             ),
           ],
         );
@@ -180,53 +127,63 @@ class _SettingScreenState extends State<SettingScreen> {
     );
 
     if (confirm == true) {
-      // User confirmed, proceed with account deletion
-      final getIP = GetIP();
-      final userIP = await getIP.getUserIP();
-      final apiUrl = '$userIP//deleteaccount.php';
+      await Provider.of<UserInfoProvider>(context, listen: false).clearUserInfo();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+        (route) => false,
+      );
+    }
+  }
 
-      try {
-        final response = await http.post(
-          Uri.parse(apiUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'id': user_info.id}),
+  Future<void> deleteAccount() async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Account"),
+          content: const Text("This action cannot be undone. Your data will be permanently deleted."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
         );
+      },
+    );
 
-        print('Server Response: ${response.body}');
+    if (confirm != true) return;
 
-        final responseData = jsonDecode(response.body);
+    final getIP = GetIP();
+    final userIP = await getIP.getUserIP();
+    final apiUrl = '$userIP/deleteaccount.php';
 
-        if (responseData['success']) {
-          // Clear user_info and navigate to WelcomeScreen
-          Provider.of<UserInfoProvider>(context, listen: false)
-              .clearUserInfo();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-          );
-        } else {
-          // Show a failure message
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text("Deletion Failed"),
-                content: Text(responseData['message']),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("OK"),
-                  ),
-                ],
-              );
-            },
-          );
-        }
-      } catch (e) {
-        print('Error: $e');
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'id': user_info.id}),
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (responseData['success']) {
+        await Provider.of<UserInfoProvider>(context, listen: false)
+            .clearUserInfo();
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          (route) => false,
+        );
+        _showSuccessSnackBar('Account deleted successfully');
+      } else {
+        _showErrorSnackBar(responseData['message'] ?? 'Failed to delete account');
       }
+    } catch (e) {
+      _showErrorSnackBar('Network error. Please try again.');
     }
   }
 
@@ -236,59 +193,95 @@ class _SettingScreenState extends State<SettingScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      resizeToAvoidBottomInset:
-          true, // This will resize the screen when the keyboard appears
       body: SingleChildScrollView(
-        // Wrap your body with SingleChildScrollView
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Current User Info:'),
-              Text('Name: ${user_info.name}'),
-              Text('Email: ${user_info.email}'),
-              const SizedBox(height: 20),
-              Text('Update User Info:'),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'New Name'),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Current User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Name: ${user_info.name}'),
+            Text('Email: ${user_info.email}'),
+            const SizedBox(height: 24),
+            const Text('Update User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'New Name',
+                border: OutlineInputBorder(),
               ),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'New Email'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: 'New Email',
+                border: OutlineInputBorder(),
               ),
-              TextField(
-                controller: passNewController,
-                decoration: const InputDecoration(labelText: 'New Password'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passNewController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New Password',
+                border: OutlineInputBorder(),
               ),
-              TextField(
-                controller: passRepeatController,
-                decoration:
-                    const InputDecoration(labelText: 'Repeat New Password'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passRepeatController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Repeat New Password',
+                border: OutlineInputBorder(),
               ),
-              TextField(
-                controller: passController,
-                decoration:
-                    const InputDecoration(labelText: 'Old Password (required)'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Current Password (required)',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
                 onPressed: saveUserInfo,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child: const Text('Save Changes'),
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
                 onPressed: disconnectUser,
-                child: const Text('Disconnect'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text('Logout'),
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
                 onPressed: deleteAccount,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Colors.red,
+                ),
                 child: const Text('Delete Account'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

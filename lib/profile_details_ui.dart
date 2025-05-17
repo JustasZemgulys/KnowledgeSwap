@@ -2,10 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:knowledgeswap/edit_forum_ui.dart';
+import 'package:knowledgeswap/forum_details_screen.dart';
 import 'package:knowledgeswap/settings_ui.dart';
 import 'package:knowledgeswap/discussion_ui.dart';
 import 'package:knowledgeswap/take_test_ui.dart';
 import 'package:knowledgeswap/group_detail_screen.dart';
+import 'package:knowledgeswap/test_assigment_details.dart';
 import 'package:knowledgeswap/voting_system.dart';
 import 'package:knowledgeswap/edit_test_ui.dart';
 import 'package:knowledgeswap/edit_resource_ui.dart';
@@ -37,6 +39,12 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   bool _isResourcesExpanded = false;
   bool _isForumItemsExpanded = false;
   bool _isGroupsExpanded = false;
+  bool _isLoadingComments = false;
+  bool _isLoadingAssignments = false;
+  List<dynamic> _userComments = [];
+  List<dynamic> _userAssignments = [];
+  bool _isCommentsExpanded = false;
+  bool _isAssignmentsExpanded = false;
 
   @override
   void initState() {
@@ -51,6 +59,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       _isLoadingResources = true;
       _isLoadingForumItems = true;
       _isLoadingGroups = true;
+      _isLoadingComments = true;
+      _isLoadingAssignments = true;
     });
 
     try {
@@ -68,6 +78,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
             _userResources = data['resources'] ?? [];
             _userForumItems = data['forum_items'] ?? [];
             _userGroups = data['groups'] ?? [];
+            _userComments = data['comments'] ?? [];
+            _userAssignments = data['assignments'] ?? [];
           });
         }
       }
@@ -79,6 +91,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
         _isLoadingResources = false;
         _isLoadingForumItems = false;
         _isLoadingGroups = false;
+        _isLoadingComments = false;
+        _isLoadingAssignments = false;
       });
     }
   }
@@ -838,348 +852,698 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: AppBar(
-      actions: [
-        PopupMenuButton<String>(
-          onSelected: (selectChoice) {
-            if (selectChoice == 'settings') {
+  Widget _buildAssignmentCard(Map<String, dynamic> assignment) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        title: Text(assignment['name'] ?? 'Unnamed Assignment'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Test: ${assignment['test_name'] ?? 'Unknown'}'),
+            if (assignment['group_name'] != null)
+              Text('Group: ${assignment['group_name']}'),
+            Text('Due: ${assignment['due_date'] ?? 'No due date'}'),
+            if (assignment['completed'] == 1)
+              const Text('Status: Completed', style: TextStyle(color: Colors.green))
+            else if (assignment['due_date'] != null && 
+                    DateTime.parse(assignment['due_date']).isBefore(DateTime.now()))
+              const Text('Status: Overdue', style: TextStyle(color: Colors.red))
+            else
+              const Text('Status: Pending', style: TextStyle(color: Colors.orange)),
+          ],
+        ),
+        trailing: assignment['group_id'] != null
+            ? IconButton(
+                icon: const Icon(Icons.group),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GroupDetailScreen(
+                        groupId: assignment['group_id'],
+                        groupName: assignment['group_name'] ?? 'Group',
+                      ),
+                    ),
+                  );
+                },
+              )
+            : null,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TestAssignmentDetailScreen(
+                assignment: {
+                  'id': assignment['id'],
+                  'name': assignment['name'],
+                  'description': assignment['description'] ?? '',
+                  'fk_test': assignment['fk_test'],
+                  'test_name': assignment['test_name'],
+                  'test_description': assignment['test_description'] ?? '',
+                  'open_date': assignment['open_date'],
+                  'due_date': assignment['due_date'],
+                  'fk_group': assignment['group_id'],
+                  'group_name': assignment['group_name'],
+                  'creator': {'id': userinfo.id}, // Add creator info
+                  'test': { // Add test info
+                    'id': assignment['fk_test'],
+                    'name': assignment['test_name'],
+                    'description': assignment['test_description'] ?? '',
+                  },
+                },
+                groupId: assignment['group_id'] ?? 0,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  Widget _buildCommentCard(Map<String, dynamic> comment) {
+    final isDeleted = comment['is_deleted'] == true || comment['user_exists'] == false;
+    final score = comment['score'] ?? 0;
+    final userVote = comment['user_vote'];
+    final parentType = comment['parent_type'];
+    final parentTitle = comment['parent_title'] ?? 'Untitled';
+    final commentText = isDeleted ? '[deleted]' : comment['text'] ?? '';
+    final creationDate = comment['creation_date'] ?? '';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        children: [
+          ListTile(
+            title: Text('Comment on: $parentTitle'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(commentText),
+                Text('Posted: $creationDate'),
+              ],
+            ),
+            onTap: () async {
+            if (parentType == 'forum_item') {
+              // First check if this forum item has a test
+              try {
+                final getIP = GetIP();
+                final userIP = await getIP.getUserIP();
+                final response = await http.get(
+                  Uri.parse('$userIP/check_forum_item_test.php?forum_item_id=${comment['fk_item']}'),
+                );
+
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.body);
+                  final hasTest = data['has_test'] ?? false;
+                  
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ForumDetailsScreen(
+                        forumItemId: comment['fk_item'],
+                        hasTest: hasTest,
+                      ),
+                    ),
+                  );
+                } else {
+                  // Fallback if we can't check
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ForumDetailsScreen(
+                        forumItemId: comment['fk_item'],
+                        hasTest: false,
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                // Fallback if there's an error
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ForumDetailsScreen(
+                      forumItemId: comment['fk_item'],
+                      hasTest: false,
+                    ),
+                  ),
+                );
+              }
+            } else if (parentType == 'test') {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SettingScreen()),
+                MaterialPageRoute(
+                  builder: (context) => DiscussionScreen(
+                    itemId: comment['fk_item'],
+                    itemType: 'test',
+                  ),
+                ),
+              );
+            } else if (parentType == 'group') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DiscussionScreen(
+                    itemId: comment['fk_item'],
+                    itemType: 'group',
+                  ),
+                ),
               );
             }
-          },
-          itemBuilder: (BuildContext context) {
-            return <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'settings',
-                child: Text('Settings'),
-              ),
-            ];
-          },
-        ),
-      ],
-      elevation: 0.0,
-      backgroundColor: const Color(0x00000000),
-    ),
-    body: SingleChildScrollView(
-      child: Stack(
-        children: [
-          ClipPath(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.deepPurple,
-              ),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 10),
-                  Center(
-                    child: GestureDetector(
-                      onTap: _showImageUpdateDialog,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            fit: BoxFit.cover,
-                            image: userinfo.imageURL != "default"
-                                ? NetworkImage(userinfo.imageURL) as ImageProvider
-                                : const AssetImage('assets/usericon.jpg') as ImageProvider,
-                            onError: (_, __) {
-                              setState(() {
-                                userinfo.imageURL = "default";
-                              });
-                            },
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_upward,
+                      color: userVote == 1 ? Colors.orange : Colors.grey,
+                    ),
+                    onPressed: isDeleted ? null : () {
+                      final newVote = userVote == 1 ? null : 1;
+                      final scoreChange = newVote == null ? -1 : (userVote == -1 ? 2 : 1);
+                      
+                      setState(() {
+                        comment['user_vote'] = newVote;
+                        comment['score'] = score + scoreChange;
+                      });
+
+                      VotingController(
+                        context: context,
+                        itemType: 'comment',
+                        itemId: comment['id'],
+                        currentScore: score + scoreChange,
+                        onScoreUpdated: (newScore) {
+                          if (mounted) {
+                            setState(() {
+                              comment['score'] = newScore;
+                            });
+                          }
+                        },
+                      ).upvote();
+                    },
+                  ),
+                  Text(score.toString()),
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_downward,
+                      color: userVote == -1 ? Colors.blue : Colors.grey,
+                    ),
+                    onPressed: isDeleted ? null : () {
+                      final newVote = userVote == -1 ? null : -1;
+                      final scoreChange = newVote == null ? 1 : (userVote == 1 ? -2 : -1);
+                      
+                      setState(() {
+                        comment['user_vote'] = newVote;
+                        comment['score'] = score + scoreChange;
+                      });
+
+                      VotingController(
+                        context: context,
+                        itemType: 'comment',
+                        itemId: comment['id'],
+                        currentScore: score + scoreChange,
+                        onScoreUpdated: (newScore) {
+                          if (mounted) {
+                            setState(() {
+                              comment['score'] = newScore;
+                            });
+                          }
+                        },
+                      ).downvote();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (selectChoice) {
+              if (selectChoice == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingScreen()),
+                );
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'settings',
+                  child: Text('Settings'),
+                ),
+              ];
+            },
+          ),
+        ],
+        elevation: 0.0,
+        backgroundColor: const Color(0x00000000),
+      ),
+      body: SingleChildScrollView(
+        child: Stack(
+          children: [
+            ClipPath(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.deepPurple,
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    Center(
+                      child: GestureDetector(
+                        onTap: _showImageUpdateDialog,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              fit: BoxFit.cover,
+                              image: userinfo.imageURL != "default"
+                                  ? NetworkImage(userinfo.imageURL) as ImageProvider
+                                  : const AssetImage('assets/usericon.jpg') as ImageProvider,
+                              onError: (_, __) {
+                                setState(() {
+                                  userinfo.imageURL = "default";
+                                });
+                              },
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Center(
-                    child: Text(
-                      userinfo.name,
-                      style: const TextStyle(
-                        fontFamily: "Karla",
-                        fontSize: 20,
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Text(
+                        userinfo.name,
+                        style: const TextStyle(
+                          fontFamily: "Karla",
+                          fontSize: 20,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 190.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Tests Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isTestsExpanded 
+                              ? Colors.deepPurple
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
                         color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Tests (${_userTests.length})'),
+                          initiallyExpanded: _isTestsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isTestsExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  bottom: Radius.circular(12),
+                                ),
+                              ),
+                              child: _isLoadingTests
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : _userTests.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No tests created yet'),
+                                        )
+                                      : Column(
+                                          children: _userTests
+                                              .map((test) => _buildTestCard(test))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Resources Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isResourcesExpanded 
+                              ? Colors.deepPurple.withOpacity(0.2)
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Resources (${_userResources.length})'),
+                          initiallyExpanded: _isResourcesExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isResourcesExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  bottom: Radius.circular(12),
+                                ),
+                              ),
+                              child: _isLoadingResources
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : _userResources.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No resources created yet'),
+                                        )
+                                      : Column(
+                                          children: _userResources
+                                              .map((resource) => _buildResourceCard(resource))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Forum Items Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isForumItemsExpanded 
+                              ? Colors.deepPurple.withOpacity(0.2)
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Forum Posts (${_userForumItems.length})'),
+                          initiallyExpanded: _isForumItemsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isForumItemsExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  bottom: Radius.circular(12),
+                                ),
+                              ),
+                              child: _isLoadingForumItems
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : _userForumItems.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No forum posts created yet'),
+                                        )
+                                      : Column(
+                                          children: _userForumItems
+                                              .map((item) => _buildForumItemCard(item))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Groups Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isGroupsExpanded 
+                              ? Colors.deepPurple.withOpacity(0.2)
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Groups (${_userGroups.length})'),
+                          initiallyExpanded: _isGroupsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isGroupsExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  bottom: Radius.circular(12),
+                                ),
+                              ),
+                              child: _isLoadingGroups
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : _userGroups.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No groups joined yet'),
+                                        )
+                                      : Column(
+                                          children: _userGroups
+                                              .map((group) => _buildGroupCard(group))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                  // Assignments Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isAssignmentsExpanded 
+                              ? Colors.deepPurple.withOpacity(0.2)
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Assignments (${_userAssignments.length})'),
+                          initiallyExpanded: _isAssignmentsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isAssignmentsExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            if (_isLoadingAssignments)
+                              const Center(child: CircularProgressIndicator())
+                            else if (_userAssignments.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text('No assignments yet'),
+                              )
+                            else
+                              ..._userAssignments.map((assignment) => _buildAssignmentCard(assignment)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                  // Comments Section
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isCommentsExpanded 
+                              ? Colors.deepPurple.withOpacity(0.2)
+                              : Colors.transparent,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text('My Comments (${_userComments.length})'),
+                          initiallyExpanded: _isCommentsExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _isCommentsExpanded = expanded;
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          collapsedShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.vertical(
+                                  bottom: Radius.circular(12),
+                                ),
+                              ),
+                              child: _isLoadingComments
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : _userComments.isEmpty
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text('No comments yet'),
+                                        )
+                                      : Column(
+                                          children: _userComments
+                                              .map((comment) => _buildCommentCard(comment))
+                                              .toList(),
+                                        ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 190.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tests Section
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isTestsExpanded 
-                            ? Colors.deepPurple.withOpacity(0.2)
-                            : Colors.transparent,
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text('My Tests (${_userTests.length})'),
-                        initiallyExpanded: _isTestsExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isTestsExpanded = expanded;
-                          });
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        collapsedShape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(12),
-                              ),
-                            ),
-                            child: _isLoadingTests
-                                ? const Center(child: CircularProgressIndicator())
-                                : _userTests.isEmpty
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No tests created yet'),
-                                      )
-                                    : Column(
-                                        children: _userTests
-                                            .map((test) => _buildTestCard(test))
-                                            .toList(),
-                                      ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                // Resources Section
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isResourcesExpanded 
-                            ? Colors.deepPurple.withOpacity(0.2)
-                            : Colors.transparent,
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text('My Resources (${_userResources.length})'),
-                        initiallyExpanded: _isResourcesExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isResourcesExpanded = expanded;
-                          });
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        collapsedShape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(12),
-                              ),
-                            ),
-                            child: _isLoadingResources
-                                ? const Center(child: CircularProgressIndicator())
-                                : _userResources.isEmpty
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No resources created yet'),
-                                      )
-                                    : Column(
-                                        children: _userResources
-                                            .map((resource) => _buildResourceCard(resource))
-                                            .toList(),
-                                      ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                // Forum Items Section
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isForumItemsExpanded 
-                            ? Colors.deepPurple.withOpacity(0.2)
-                            : Colors.transparent,
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text('My Forum Posts (${_userForumItems.length})'),
-                        initiallyExpanded: _isForumItemsExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isForumItemsExpanded = expanded;
-                          });
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        collapsedShape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(12),
-                              ),
-                            ),
-                            child: _isLoadingForumItems
-                                ? const Center(child: CircularProgressIndicator())
-                                : _userForumItems.isEmpty
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No forum posts created yet'),
-                                      )
-                                    : Column(
-                                        children: _userForumItems
-                                            .map((item) => _buildForumItemCard(item))
-                                            .toList(),
-                                      ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                // Groups Section
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isGroupsExpanded 
-                            ? Colors.deepPurple.withOpacity(0.2)
-                            : Colors.transparent,
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text('My Groups (${_userGroups.length})'),
-                        initiallyExpanded: _isGroupsExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isGroupsExpanded = expanded;
-                          });
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        collapsedShape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(12),
-                              ),
-                            ),
-                            child: _isLoadingGroups
-                                ? const Center(child: CircularProgressIndicator())
-                                : _userGroups.isEmpty
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No groups joined yet'),
-                                      )
-                                    : Column(
-                                        children: _userGroups
-                                            .map((group) => _buildGroupCard(group))
-                                            .toList(),
-                                      ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 }

@@ -81,14 +81,10 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
   }
 
   Widget _buildResourcePreview(String iconPath, String filePath) {
-    // Debug print to verify paths
-    //debugPrint('Icon Path: $iconPath');
-    //debugPrint('File Path: $filePath');
 
     // 1. Always try to show icon image first if available
     if (iconPath.isNotEmpty) {
       final iconUrl = '$serverIP/${iconPath.replaceAll(RegExp(r'^/+'), '')}';
-      //debugPrint('Icon URL: $iconUrl');
       
       return Image.network(
         iconUrl,
@@ -129,7 +125,6 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
         filePath.toLowerCase().endsWith('.jpeg') ||
         filePath.toLowerCase().endsWith('.png')) {
       final imageUrl = '$serverIP/${filePath.replaceAll(RegExp(r'^/+'), '')}';
-      debugPrint('File image URL: $imageUrl');
       
       return Image.network(
         imageUrl,
@@ -195,11 +190,17 @@ class _ResourceSearchScreenState extends State<ResourceSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search Resources'),
+        title: const Text(
+                'Search Resources',
+                style: TextStyle(color: Colors.deepPurple),
+              ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
           onPressed: () => Navigator.pop(context),
         ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
       ),
       body: Column(
         children: [

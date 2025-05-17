@@ -87,23 +87,24 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _fetchAttachedResources();
-        setState(() {
-          groupDetails = Map<String, dynamic>.from(data['group']);
-          members = List<dynamic>.from(data['group']['members'] ?? []);
-          bannedUsers = List<dynamic>.from(data['group']['banned_users'] ?? []);
-          isLoading = false;
-        });
-      } else {
-        throw Exception('Server returned status code ${response.statusCode}');
+        if (mounted) {
+          setState(() {
+            groupDetails = Map<String, dynamic>.from(data['group']);
+            members = List<dynamic>.from(data['group']['members'] ?? []);
+            bannedUsers = List<dynamic>.from(data['group']['banned_users'] ?? []);
+            isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading group details: $e')),
-      );
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading group details: $e')),
+        );
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -478,14 +479,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       MaterialPageRoute(
         builder: (context) => EditGroupScreen(
           group: groupDetails!,
-          onGroupUpdated: (success) {
-            // This callback will be called from EditGroupScreen
+          onGroupUpdated: (success) async  {
             if (success) {
-              // Refresh all data
-              _fetchGroupDetails();
-              _fetchAttachedResources();
-              _fetchAttachedTests();
-              _fetchTestAssignments();
+              // Refresh all data before returning
+              await _fetchGroupDetails();
+              await _fetchAttachedResources();
+              await _fetchAttachedTests();
+              await _fetchTestAssignments();
+              if (mounted) {
+                setState(() {});
+              }
             }
             Navigator.pop(context, success); // Close the edit screen
           },
@@ -493,7 +496,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ),
     );
     
-    // This will handle cases where the edit screen is closed without saving
+    // If we got a success result, refresh the UI
     if (result == true && mounted) {
       setState(() {});
     }
@@ -1061,6 +1064,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Future<void> _fetchTestAssignments() async {
     if (serverIP == null) return;
 
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       final url = Uri.parse('$serverIP/get_group_test_assignments.php?group_id=${widget.groupId}');
       final response = await http.get(url);
@@ -1070,11 +1077,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         if (data['success'] == true) {
           setState(() {
             testAssignments = List<dynamic>.from(data['assignments'] ?? []);
+            isLoading = false;
           });
         }
       }
     } catch (e) {
       debugPrint('Error fetching test assignments: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -1090,9 +1101,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
 
     if (result != null && result['success'] == true) {
-      _fetchTestAssignments();
+      // Refresh the list
+      await _fetchTestAssignments();
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Test assignment created successfully')),
+        const SnackBar(content: Text('Assignment created successfully')),
       );
     }
   }
@@ -1123,6 +1136,32 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting assignment: $e')),
+      );
+    }
+  }
+
+  Future<void> _editAssignment(Map<String, dynamic> assignment) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTestAssignmentScreen(
+          groupId: widget.groupId,
+          creatorId: user_info.id,
+          initialAssignment: assignment,
+        ),
+      ),
+    );
+    
+    if (result != null && result['success'] == true) {
+      // Force refresh the assignments list before showing the screen
+      await _fetchTestAssignments();
+      
+      if (mounted) {
+        setState(() {}); // Trigger a rebuild to show the updated data
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment updated successfully')),
       );
     }
   }
@@ -1159,8 +1198,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               ),
             ),
           );
-          if (result != null && result['users_updated'] == true) {
-            _fetchTestAssignments();
+          if (result != null && (result['users_updated'] == true || result['updated'] == true)) {
+            await _fetchTestAssignments();
+            if (mounted) setState(() {});
           }
         },
         child: Padding(
@@ -1187,6 +1227,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       icon: const Icon(Icons.more_vert, size: 20),
                       itemBuilder: (context) => [
                         const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit, size: 20),
+                            title: Text('Edit Assignment', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        const PopupMenuItem(
                           value: 'remove',
                           child: ListTile(
                             leading: Icon(Icons.delete, size: 20, color: Colors.red),
@@ -1197,6 +1244,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       onSelected: (value) async {
                         if (value == 'remove') {
                           await _deleteAssignment(assignment['id']);
+                        } else if (value == 'edit') {
+                          await _editAssignment(assignment);
                         }
                       },
                     ),
@@ -1237,7 +1286,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1328,6 +1376,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     title: const Text('Attach Test'),
                   ),
                 ),
+                if (isAdmin || isModerator)
+                  PopupMenuItem(
+                    value: 'create_assignment',
+                    child: ListTile(
+                      leading: const Icon(Icons.assignment_add),
+                      title: const Text('Create New Assignment'),
+                    ),
+                  ),
               ];
             },
             onSelected: (value) {
@@ -1366,6 +1422,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   _attachResourceToGroup();
                 case 'attach_test':
                   _attachTestToGroup();
+                case 'create_assignment':
+                  _createTestAssignment();
                   break;
               }
             },

@@ -33,7 +33,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
   List<dynamic> _assignedUsers = [];
   bool _isLoading = false;
   String? _serverIP;
-  bool _canTakeTest = false;
+
 
   @override
   void initState() {
@@ -148,8 +148,10 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
         ),
       ),
     );
+
+    await _updateAssignedUsers(users!);
     
-    if (users != null) {
+    /*if (users != null) {
       // Combine existing and new users, removing duplicates
       final updatedUserList = [..._assignedUsers, ...users]
         .fold(<dynamic>[], (list, user) {
@@ -160,7 +162,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
         });
       
       await _updateAssignedUsers(updatedUserList);
-    }
+    }*/
   }
 
   Future<void> _removeUserFromAssignment(int userId) async {
@@ -180,8 +182,12 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       ),
     );
 
+    // If we got back an update, pop all routes back to group screen
     if (result != null && result['success'] == true) {
-      Navigator.pop(context, {'updated': true});
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment updated successfully')),
+      );
     }
   }
 
@@ -265,6 +271,29 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
         SnackBar(content: Text('Error viewing submission: $e')),
       );
     }
+  }
+
+  bool _isTestAvailable() {
+    final now = DateTime.now();
+    final openDate = widget.assignment['open_date'] != null 
+        ? DateTime.parse(widget.assignment['open_date']) 
+        : null;
+    final dueDate = widget.assignment['due_date'] != null 
+        ? DateTime.parse(widget.assignment['due_date']) 
+        : null;
+
+    // If no open date, test is always available (unless there's a due date in the past)
+    if (openDate == null) {
+      return dueDate == null || now.isBefore(dueDate);
+    }
+    
+    // If there's an open date, check if we're past it
+    final isAfterOpenDate = now.isAfter(openDate);
+    
+    // If there's a due date, check if we're before it
+    final isBeforeDueDate = dueDate == null || now.isBefore(dueDate);
+    
+    return isAfterOpenDate && isBeforeDueDate;
   }
 
   Widget _buildResourceCard(Map<String, dynamic> resource) {
@@ -374,7 +403,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                             ),
                           );
                         } else if (value == 'remove') {
-                          // Implement remove functionality if needed
+                          // Implement remove functionality
                         }
                       },
                     ),
@@ -390,54 +419,45 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
 
   Widget _buildTestCard(Map<String, dynamic> test) {
     final currentUser = Provider.of<UserInfoProvider>(context).userInfo;
-    final hasCompleted = _assignedUsers.any((user) =>
+    final isAssigned = _assignedUsers.any((user) => user['id'] == currentUser?.id);
+    final hasCompleted = isAssigned && _assignedUsers.any((user) => 
         user['id'] == currentUser?.id && user['completed'] == true);
+    final isTestAvailable = _isTestAvailable();
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8), // Adjust margin as needed
+      margin: const EdgeInsets.symmetric(vertical: 8),
       color: hasCompleted ? Colors.grey[200] : null,
       child: InkWell(
-        onTap: hasCompleted
-            ? null // Disable tap if completed
-            : () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TakeTestScreen(
-                      testId: test['id'],
-                      groupId: widget.groupId,
-                      assignmentId: widget.assignment['id'],
-                    ),
-                  ),
-                );
+        onTap: !isAssigned 
+            ? null 
+            : (hasCompleted || !isTestAvailable)
+                ? null
+                : () async {
+                    final result = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TakeTestScreen(
+                          testId: test['id'],
+                          groupId: widget.groupId,
+                          assignmentId: widget.assignment['id'],
+                        ),
+                      ),
+                    );
 
-                if (result == true && mounted) {
-                  await _fetchAssignedUsers(); // Refresh the data immediately
-                  setState(() {}); // Trigger UI update
-                }
-              },
+                    if (result == true && mounted) {
+                      await _fetchAssignedUsers();
+                      setState(() {});
+                    }
+                  },
         child: Container(
-          width: double.infinity, // Ensure the container takes full width
+          width: double.infinity,
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                test['name'] ?? 'Untitled Test',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              if (!_canTakeTest && widget.assignment['open_date'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Available on ${DateFormat('MMM dd, yyyy HH:mm').format(DateTime.parse(widget.assignment['open_date']))}',
-                    style: TextStyle(color: Colors.orange[700]),
-                  ),
-                ),
-            ],
+          child: Text(
+            test['name'] ?? 'Untitled Test',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
         ),
       ),
@@ -641,7 +661,7 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                   value: 'discussion',
                   child: ListTile(
                     leading: const Icon(Icons.forum),
-                    title: const Text('Go to Discussion'),
+                    title: const Text('Go to user Answers'),
                   ),
                 ),
             ],
@@ -672,13 +692,13 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
         : null;
     final userInfo = Provider.of<UserInfoProvider>(context).userInfo;
     final isAdmin = userInfo?.id == assignment['creator']['id'];
-    final isModerator = false; // Implement your moderator check logic here
-    final title = assignment['name'];
+    final isModerator = widget.userRole == 'moderator';
+    final isAssigned = _assignedUsers.any((user) => user['id'] == currentUser?.id);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Assignment: ${title}',
+          'Assignment details',
           style: TextStyle(color: Colors.deepPurple),
         ),
         elevation: 0,
@@ -764,6 +784,29 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
+            const Divider(),
+            if (!isAssigned)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.red[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You are not assigned to this test and cannot take it',
+                      style: TextStyle(color: Colors.red[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

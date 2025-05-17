@@ -138,6 +138,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _updateGroup() async {
+    setState(() {
+      _isUploading = true;
+    });
+
     try {
       final getIP = GetIP();
       final userIP = await getIP.getUserIP();
@@ -155,33 +159,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           _iconBytes!,
           filename: _iconName,
         ));
-      } else if (_iconBytes == null && widget.initialData?['icon_path'] != null) {
-        request.fields['remove_icon'] = '1';
       }
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      final jsonResponse = jsonDecode(responseBody);
 
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(responseBody);
-        if (jsonResponse['success'] == true) {
-          // Call the callback if it exists
-          if (widget.onGroupUpdated != null) {
-            widget.onGroupUpdated!();
-          } else {
-            Navigator.pop(context, true); // Fallback if no callback
-          }
+      if (response.statusCode == 200 && jsonResponse['success'] == true) {
+        // Only trigger callback on success
+        if (widget.onGroupUpdated != null) {
+          widget.onGroupUpdated!();
         } else {
-          _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
+          Navigator.pop(context, true);
         }
       } else {
-        _showErrorSnackBar('Server error: ${response.statusCode}');
+        _showErrorSnackBar(jsonResponse['message'] ?? 'Update failed');
       }
     } catch (e) {
       _showErrorSnackBar('Error: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
-
+  
   Future<void> _loadExistingIcon() async {
     if (widget.initialData == null || 
         widget.initialData!['icon_path'] == null || 

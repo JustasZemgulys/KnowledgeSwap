@@ -54,10 +54,28 @@ class _ForumScreenState extends State<ForumScreen> {
       serverIP = await getIP.getUserIP();
       _fetchForumItems();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error connecting to server: $e')),
-      );
+      _showErrorSnackBar('Failed to connect to server. Please try again later.');
     }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _fetchForumItems() async {
@@ -76,7 +94,6 @@ class _ForumScreenState extends State<ForumScreen> {
         setState(() {
           totalItems = int.tryParse(data['total'].toString()) ?? 0;
           
-          // Handle empty page by going back one page
           if (data['items'].isEmpty && currentPage > 1) {
             currentPage--;
             _fetchForumItems();
@@ -88,19 +105,11 @@ class _ForumScreenState extends State<ForumScreen> {
           isLoading = false;
         });
       } else {
-        throw Exception('Server returned status code ${response.statusCode}');
+        _showErrorSnackBar('Server error occurred. Please try again.');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Retry',
-            onPressed: _fetchForumItems,
-          ),
-        ),
-      );
+      _showErrorSnackBar('Failed to load forum items. Please check your connection.');
+    } finally {
       setState(() {
         isLoading = false;
       });
@@ -116,7 +125,8 @@ class _ForumScreenState extends State<ForumScreen> {
     );
     
     if (result == true) {
-      await _fetchForumItems(); // Refresh the list
+      _showSuccessSnackBar('Forum item updated successfully');
+      await _fetchForumItems();
     }
   }
 
@@ -152,16 +162,14 @@ class _ForumScreenState extends State<ForumScreen> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['success'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Forum item deleted successfully')),
-            );
+            _showSuccessSnackBar('Forum item deleted successfully');
             await _fetchForumItems();
+          } else {
+            _showErrorSnackBar(data['message'] ?? 'Failed to delete forum item');
           }
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        _showErrorSnackBar('Network error occurred. Please try again.');
       }
     }
   }
@@ -186,24 +194,23 @@ class _ForumScreenState extends State<ForumScreen> {
     });
 
     if (newOrder == 'score') {
-      // Sort by score and then by name
       setState(() {
         forumItems.sort((a, b) {
           int scoreA = a['score'] ?? 0;
           int scoreB = b['score'] ?? 0;
 
           if (scoreA != scoreB) {
-            return scoreB.compareTo(scoreA); // Higher score first
+            return scoreB.compareTo(scoreA);
           } else {
             String nameA = a['title']?.toLowerCase() ?? '';
             String nameB = b['title']?.toLowerCase() ?? '';
-            return nameA.compareTo(nameB); // Alphabetical order
+            return nameA.compareTo(nameB);
           }
         });
         filteredItems = List<dynamic>.from(forumItems);
       });
     } else {
-      _fetchForumItems(); // Fetch forum items with the new sort order
+      _fetchForumItems();
     }
   }
 
@@ -314,57 +321,49 @@ class _ForumScreenState extends State<ForumScreen> {
                   ),
                 ],
               ),
-              Positioned(
+              if (isOwner) ...[Positioned(
                 top: 0,
                 right: 0,
                 child: PopupMenuButton<String>(
                   icon: Icon(Icons.more_vert, 
                     color: Colors.grey[600], 
                     size: 20),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'discussions',
-                      child: ListTile(
-                        leading: Icon(Icons.forum, size: 20),
-                        title: Text('View Discussions', style: TextStyle(fontSize: 14)),
-                      ),
-                    ),
-                    if (isOwner) ...[
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit, size: 20),
-                          title: Text('Edit', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(Icons.delete, size: 20, color: Colors.red),
-                          title: Text('Delete', style: TextStyle(fontSize: 14, color: Colors.red)),
-                        ),
-                      ),
-                    ],
-                  ],
-                  onSelected: (value) async {
-                    if (value == 'discussions') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DiscussionScreen(
-                            itemId: itemId,
-                            itemType: 'forum_item',
+                    itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit, size: 20),
+                            title: Text('Edit', style: TextStyle(fontSize: 14)),
                           ),
                         ),
-                      );
-                    } else if (value == 'edit') {
-                      await _editForumItem(item);
-                    } else if (value == 'delete') {
-                      await _deleteForumItem(itemId);
-                    }
-                  },
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, size: 20, color: Colors.red),
+                            title: Text('Delete', style: TextStyle(fontSize: 14, color: Colors.red)),
+                          ),
+                        ),
+                    ],
+                    onSelected: (value) async {
+                      if (value == 'discussions') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DiscussionScreen(
+                              itemId: itemId,
+                              itemType: 'forum_item',
+                            ),
+                          ),
+                        );
+                      } else if (value == 'edit') {
+                        await _editForumItem(item);
+                      } else if (value == 'delete') {
+                        await _deleteForumItem(itemId);
+                      }
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -449,6 +448,7 @@ class _ForumScreenState extends State<ForumScreen> {
               ).then((refresh) {
                 if (refresh == true) {
                   _fetchForumItems();
+                  _showSuccessSnackBar('Forum item created successfully');
                 }
               });
             },
