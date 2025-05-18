@@ -62,6 +62,57 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
     _serverIP = await getIP.getUserIP();
   }
 
+  Future<void> _refreshAssignmentData() async {
+    if (_serverIP == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // First get the updated assignment details
+      final assignmentUrl = Uri.parse('$_serverIP/get_group_test_assignments.php?group_id=${widget.groupId}');
+      final assignmentResponse = await http.get(assignmentUrl);
+
+      if (assignmentResponse.statusCode == 200) {
+        final assignmentData = jsonDecode(assignmentResponse.body);
+        if (assignmentData['success'] == true) {
+          // Find our specific assignment in the list
+          final updatedAssignment = (assignmentData['assignments'] as List)
+              .firstWhere((a) => a['id'] == widget.assignment['id'], orElse: () => null);
+
+          if (updatedAssignment != null) {
+            // Update the widget's assignment data (we need to use a callback to modify parent's state)
+            if (mounted) {
+              setState(() {
+                widget.assignment
+                  ..['name'] = updatedAssignment['name']
+                  ..['description'] = updatedAssignment['description']
+                  ..['open_date'] = updatedAssignment['open_date']
+                  ..['due_date'] = updatedAssignment['due_date']
+                  ..['test'] = updatedAssignment['test']
+                  ..['resource'] = updatedAssignment['resource'];
+              });
+            }
+          }
+        }
+      }
+
+      // Then refresh the assigned users
+      await _fetchAssignedUsers();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error refreshing assignment: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchAssignedUsers() async {
     if (_serverIP == null) return;
 
@@ -111,17 +162,15 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       final responseData = json.decode(response.body);
       
       if (responseData['success'] == true) {
-        // Update the local state with the new user list
-        setState(() {
-          _assignedUsers = updatedUserList;
-        });
+        // Refresh both the users list and assignment details
+        await Future.wait([
+          _refreshAssignmentData(),
+          _fetchAssignedUsers(),
+        ]);
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Users updated successfully')),
         );
-        
-        // Refresh the data from server to ensure consistency
-        await _fetchAssignedUsers();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Failed to update users')),
@@ -132,9 +181,11 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
         SnackBar(content: Text('Error updating users: $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -182,9 +233,9 @@ class _TestAssignmentDetailScreenState extends State<TestAssignmentDetailScreen>
       ),
     );
 
-    // If we got back an update, pop all routes back to group screen
+    // If we got back an update, refresh the data but stay on this screen
     if (result != null && result['success'] == true) {
-      Navigator.pop(context);
+      await _refreshAssignmentData();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Assignment updated successfully')),
       );

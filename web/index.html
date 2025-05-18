@@ -37,6 +37,15 @@
 <body>
   <script>window._scriptUrls = window._scriptUrls || new Set();</script>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window._flutter_web_set_asset_base_url = function(url) {
+      // Override to prevent the duplicate declaration
+      if (!window._scriptUrls) {
+        window._scriptUrls = new Set();
+      }
+      // Original logic would go here
+    };
+  </script>
   <script src="main.dart.js" type="application/javascript"></script>
 </body>
 </html>

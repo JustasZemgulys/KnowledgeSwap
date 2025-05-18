@@ -25,7 +25,9 @@ class KnowledgeSwapApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      
       title: 'KnowledgeSwap',
+      debugShowCheckedModeBanner: false,
       initialRoute: '/',
       onGenerateRoute: AppRouter.generateRoute,
       navigatorObservers: [RouteObserver<PageRoute>()],

@@ -151,7 +151,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         ..fields['group_id'] = widget.initialData!['id'].toString()
         ..fields['name'] = _groupNameController.text
         ..fields['description'] = _groupDescriptionController.text
-        ..fields['visibility'] = _isPrivate ? '0' : '1';
+        ..fields['visibility'] = _isPrivate ? '0' : '1'
+        // Add this line to send remove_icon flag when icon is removed
+        ..fields['remove_icon'] = (_iconBytes == null && widget.initialData?['icon_path'] != null) ? '1' : '0';
 
       if (_iconBytes != null && _iconBytes!.isNotEmpty) {
         request.files.add(http.MultipartFile.fromBytes(
@@ -166,7 +168,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       final jsonResponse = jsonDecode(responseBody);
 
       if (response.statusCode == 200 && jsonResponse['success'] == true) {
-        // Only trigger callback on success
         if (widget.onGroupUpdated != null) {
           widget.onGroupUpdated!();
         } else {

@@ -479,18 +479,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       MaterialPageRoute(
         builder: (context) => EditGroupScreen(
           group: groupDetails!,
-          onGroupUpdated: (success) async  {
-            if (success) {
-              // Refresh all data before returning
-              await _fetchGroupDetails();
-              await _fetchAttachedResources();
-              await _fetchAttachedTests();
-              await _fetchTestAssignments();
-              if (mounted) {
-                setState(() {});
-              }
+          onGroupUpdated: (success) async {
+            if (success && mounted) {
+              // Force refresh all data
+              await Future.wait([
+                _fetchGroupDetails(),
+                _fetchAttachedResources(),
+                _fetchAttachedTests(),
+                _fetchTestAssignments(),
+              ]);
+              setState(() {});
             }
-            Navigator.pop(context, success); // Close the edit screen
+            Navigator.pop(context, success);
           },
         ),
       ),
@@ -1444,7 +1444,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.groupName,
+                        groupDetails?['name'] ?? widget.groupName, // Use updated name if available
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 16),
@@ -1598,9 +1598,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                   child: Column(
                                     children: [
                                       if (bannedUsers.isEmpty)
-                                        const Padding(
-                                          padding: EdgeInsets.all(16.0),
-                                          child: Text('No banned users'),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(16.0),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).cardColor,
+                                          ),
+                                          child: const Center(
+                                            child: Text('No banned users'),
+                                          ),
                                         )
                                       else
                                         ...bannedUsers.map((user) {
@@ -1672,9 +1678,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 child: Column(
                                   children: [
                                     if (attachedResources.isEmpty)
-                                      const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No resources attached'),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16.0),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                        ),
+                                        child: const Center(
+                                          child: Text('No resources attached'),
+                                        ),
                                       )
                                     else
                                       ...attachedResources.map((resource) => _buildResourceCard(resource)),
@@ -1734,9 +1746,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 child: Column(
                                   children: [
                                     if (attachedTests.isEmpty)
-                                      const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No tests attached'),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16.0),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                        ),
+                                        child: const Center(
+                                          child: Text('No tests attached'),
+                                        ),
                                       )
                                     else
                                       ...attachedTests.map((test) => _buildTestCard(test)),
@@ -1796,9 +1814,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                 child: Column(
                                   children: [
                                     if (testAssignments.isEmpty)
-                                      const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Text('No test assignments yet'),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(16.0),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                        ),
+                                        child: const Center(
+                                          child: Text('No test assignments yet'),
+                                        ),
                                       )
                                     else
                                       ...testAssignments.map((assignment) => _buildAssignmentCard(assignment)),
