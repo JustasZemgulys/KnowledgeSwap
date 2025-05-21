@@ -1,4 +1,4 @@
-# knowledgeswap
+# KnowledgeSwap
 
 KnowledgeSwap - Automated Test Generation Learning System
 # Overview
