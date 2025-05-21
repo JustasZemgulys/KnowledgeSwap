@@ -26,13 +26,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conn->begin_transaction();
     
     try {
-        // First delete all members from the group
+        // 1. Delete all test assignment users (results)
+        $deleteAssignmentUsers = $conn->prepare("
+            DELETE tau FROM test_assignment_user tau
+            JOIN test_assignment ta ON tau.fk_assignment = ta.id
+            WHERE ta.fk_group = ?
+        ");
+        $deleteAssignmentUsers->bind_param("i", $groupId);
+        $deleteAssignmentUsers->execute();
+        $deleteAssignmentUsers->close();
+
+        // 2. Delete all test assignments
+        $deleteAssignments = $conn->prepare("DELETE FROM test_assignment WHERE fk_group = ?");
+        $deleteAssignments->bind_param("i", $groupId);
+        $deleteAssignments->execute();
+        $deleteAssignments->close();
+
+        // 3. Delete all group resources (just the associations, not the actual resources)
+        $deleteGroupResources = $conn->prepare("DELETE FROM group_resource WHERE fk_group = ?");
+        $deleteGroupResources->bind_param("i", $groupId);
+        $deleteGroupResources->execute();
+        $deleteGroupResources->close();
+
+        // 4. Delete all group tests (just the associations, not the actual tests)
+        $deleteGroupTests = $conn->prepare("DELETE FROM group_test WHERE fk_group = ?");
+        $deleteGroupTests->bind_param("i", $groupId);
+        $deleteGroupTests->execute();
+        $deleteGroupTests->close();
+
+        // 5. Delete all group members
         $deleteMembers = $conn->prepare("DELETE FROM group_member WHERE fk_group = ?");
         $deleteMembers->bind_param("i", $groupId);
         $deleteMembers->execute();
         $deleteMembers->close();
-        
-        // Then delete the group itself
+
+        // 6. Delete any forum items associated with this group
+        $deleteForumItems = $conn->prepare("DELETE FROM forum_item WHERE fk_group = ?");
+        $deleteForumItems->bind_param("i", $groupId);
+        $deleteForumItems->execute();
+        $deleteForumItems->close();
+
+        // 7. Finally delete the group itself
         $deleteGroup = $conn->prepare("DELETE FROM `group` WHERE id = ?");
         $deleteGroup->bind_param("i", $groupId);
         $deleteGroup->execute();
@@ -54,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         echo json_encode([
             'success' => true,
-            'message' => 'Group deleted successfully',
+            'message' => 'Group and all related data deleted successfully',
             'deleted_files' => $deletedFiles
         ]);
     } catch (Exception $e) {

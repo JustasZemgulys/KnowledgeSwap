@@ -6,13 +6,16 @@ $conn = getDBConnection();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+header('Content-Type: application/json');
 $response = ['success' => false, 'message' => ''];
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     
     if (!isset($data['group_id'], $data['email'], $data['inviter_id'])) {
-        throw new Exception("Missing required parameters");
+        $response['message'] = "Missing required parameters";
+        echo json_encode($response);
+        exit;
     }
     
     $groupId = (int)$data['group_id'];
@@ -27,7 +30,9 @@ try {
     $inviter = $result->fetch_assoc();
     
     if (!$inviter || ($inviter['role'] !== 'admin' && $inviter['role'] !== 'moderator')) {
-        throw new Exception("You don't have permission to invite users");
+        $response['message'] = "You don't have permission to invite users";
+        echo json_encode($response);
+        exit;
     }
     
     // Find user by email
@@ -38,19 +43,26 @@ try {
     $user = $result->fetch_assoc();
     
     if (!$user) {
-        throw new Exception("User with this email not found");
+        $response['message'] = "User with this email not found";
+        echo json_encode($response);
+        exit;
     }
     
     $userId = $user['id'];
     
     // Check if user is already in the group
-    $stmt = $conn->prepare("SELECT 1 FROM group_member WHERE fk_group = ? AND fk_user = ?");
+    $stmt = $conn->prepare("SELECT role FROM group_member WHERE fk_group = ? AND fk_user = ?");
     $stmt->bind_param("ii", $groupId, $userId);
     $stmt->execute();
     $result = $stmt->get_result();
     
     if ($result->num_rows > 0) {
-        throw new Exception("User is already a member of this group");
+        $memberData = $result->fetch_assoc();
+        $response['message'] = ($memberData['role'] === 'banned') 
+            ? "User is banned from this group" 
+            : "User is already a member of this group";
+        echo json_encode($response);
+        exit;
     }
     
     // Add user to group as regular member
@@ -58,7 +70,9 @@ try {
     $stmt->bind_param("ii", $groupId, $userId);
     
     if (!$stmt->execute()) {
-        throw new Exception("Failed to add user to group: " . $stmt->error);
+        $response['message'] = "Failed to add user to group: " . $stmt->error;
+        echo json_encode($response);
+        exit;
     }
     
     $response = [
@@ -66,11 +80,13 @@ try {
         'message' => 'User added to group successfully'
     ];
     
+    echo json_encode($response);
     $conn->close();
+    exit;
+    
 } catch (Exception $e) {
-    http_response_code(500);
     $response['message'] = $e->getMessage();
+    echo json_encode($response);
+    exit;
 }
-
-echo json_encode($response);
 ?>

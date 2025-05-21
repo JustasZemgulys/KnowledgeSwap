@@ -63,20 +63,38 @@ try {
     
     // Update assigned users if provided
     if (isset($data['user_ids']) && is_array($data['user_ids'])) {
-        // First delete existing assignments
-        $deleteQuery = "DELETE FROM test_assignment_user WHERE fk_assignment = ?";
+        // First delete only uncompleted assignments
+        $deleteQuery = "DELETE FROM test_assignment_user 
+                       WHERE fk_assignment = ? 
+                       AND fk_user NOT IN (SELECT fk_user FROM test_assignment_user 
+                                          WHERE fk_assignment = ? AND completed = 1)";
         $deleteStmt = $conn->prepare($deleteQuery);
-        $deleteStmt->bind_param("i", $assignmentId);
+        $deleteStmt->bind_param("ii", $assignmentId, $assignmentId);
         $deleteStmt->execute();
         $deleteStmt->close();
         
-        // Insert new assignments
+        // Get current users to avoid duplicates
+        $currentUsersQuery = "SELECT fk_user FROM test_assignment_user WHERE fk_assignment = ?";
+        $currentUsersStmt = $conn->prepare($currentUsersQuery);
+        $currentUsersStmt->bind_param("i", $assignmentId);
+        $currentUsersStmt->execute();
+        $result = $currentUsersStmt->get_result();
+        
+        $existingUsers = [];
+        while ($row = $result->fetch_assoc()) {
+            $existingUsers[] = $row['fk_user'];
+        }
+        $currentUsersStmt->close();
+        
+        // Insert new assignments (only for users not already assigned)
         $insertQuery = "INSERT INTO test_assignment_user (fk_assignment, fk_user) VALUES (?, ?)";
         $insertStmt = $conn->prepare($insertQuery);
         
         foreach ($data['user_ids'] as $userId) {
-            $insertStmt->bind_param("ii", $assignmentId, $userId);
-            $insertStmt->execute();
+            if (!in_array($userId, $existingUsers)) {
+                $insertStmt->bind_param("ii", $assignmentId, $userId);
+                $insertStmt->execute();
+            }
         }
         
         $insertStmt->close();
@@ -98,6 +116,7 @@ try {
     ];
 }
 
+header('Content-Type: application/json');
 echo json_encode($response);
 exit;
 ?>

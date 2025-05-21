@@ -8,11 +8,12 @@ error_reporting(0);
 $response = ['success' => false, 'message' => 'Request failed'];
 
 try {
-
     $groupId = (int)($_POST['group_id'] ?? 0);
     if ($groupId <= 0) throw new Exception("Invalid group ID");
     
-    $remove_icon = isset($_POST['remove_icon']) && $_POST['remove_icon'] === '1';
+    // Properly handle remove_icon flag (can come as string '1' or true)
+    $remove_icon = isset($_POST['remove_icon']) && 
+                  ($_POST['remove_icon'] === '1' || $_POST['remove_icon'] === true);
 
     // Get existing icon path
     $stmt = $conn->prepare("SELECT icon_path FROM `group` WHERE id = ?");
@@ -28,8 +29,8 @@ try {
     
     if ($remove_icon) {
         // Delete old icon if exists
-        if (!empty($newIconPath) && file_exists($newIconPath)) {
-            unlink($newIconPath);
+        if (!empty($group['icon_path']) && file_exists($group['icon_path'])) {
+            unlink($group['icon_path']);
         }
         $newIconPath = null;
     } 
@@ -51,44 +52,28 @@ try {
         }
         
         // Delete old icon if exists
-        if (!empty($newIconPath) && file_exists($newIconPath)) {
-            unlink($newIconPath);
+        if (!empty($group['icon_path']) && file_exists($group['icon_path'])) {
+            unlink($group['icon_path']);
         }
         
         $newIconPath = $newIcon;
     }
 
-    // Update database
-    if ($newIconPath === null) {
-        $stmt = $conn->prepare("UPDATE `group` SET 
-            name = ?, 
-            description = ?, 
-            visibility = ?,
-            icon_path = NULL
-            WHERE id = ?");
-        
-        $stmt->bind_param("ssii", 
-            $_POST['name'],
-            $_POST['description'],
-            $_POST['visibility'],
-            $groupId
-        );
-    } else {
-        $stmt = $conn->prepare("UPDATE `group` SET 
-            name = ?, 
-            description = ?, 
-            visibility = ?,
-            icon_path = ?
-            WHERE id = ?");
-        
-        $stmt->bind_param("ssisi", 
-            $_POST['name'],
-            $_POST['description'],
-            $_POST['visibility'],
-            $newIconPath,
-            $groupId
-        );
-    }
+    // Update database - always include icon_path in the query
+    $stmt = $conn->prepare("UPDATE `group` SET 
+        name = ?, 
+        description = ?, 
+        visibility = ?,
+        icon_path = ?
+        WHERE id = ?");
+    
+    $stmt->bind_param("ssisi", 
+        $_POST['name'],
+        $_POST['description'],
+        $_POST['visibility'],
+        $newIconPath, // Will be NULL if removed
+        $groupId
+    );
 
     if (!$stmt->execute()) {
         throw new Exception("DB update failed: ".$conn->error);

@@ -11,6 +11,21 @@ ini_set('display_errors', 1);
 $requestedPath = isset($_GET['path']) ? urldecode($_GET['path']) : '';
 $requestedPath = ltrim($requestedPath, '/'); // Remove leading slashes
 
+if ($requestedPath === 'default') {
+    // Serve a default image
+    $defaultImage = $_SERVER['DOCUMENT_ROOT'] . '/assets/default_profile.png';
+    if (file_exists($defaultImage)) {
+        header('Content-Type: image/png');
+        readfile($defaultImage);
+        exit;
+    } else {
+        // If no default image exists, return a blank 1x1 pixel
+        header('Content-Type: image/png');
+        echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+        exit;
+    }
+}
+
 // Validate path
 if (empty($requestedPath)) {
     http_response_code(400);

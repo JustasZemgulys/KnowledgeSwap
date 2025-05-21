@@ -3,7 +3,7 @@ require_once 'db_connect.php';
 
 $conn = getDBConnection();
 
-$response = ['success' => false, 'message' => '', 'added_count' => 0];
+$response = ['success' => false, 'message' => '', 'added_count' => 0, 'preserved_count' => 0];
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -26,26 +26,61 @@ try {
     $conn->begin_transaction();
     
     try {
-        // First delete all existing assignments for this test
-        $deleteQuery = "DELETE FROM test_assignment_user WHERE fk_assignment = ?";
+        // First delete only assignments where users haven't completed the test
+        $deleteQuery = "DELETE FROM test_assignment_user 
+                        WHERE fk_assignment = ? 
+                        AND fk_user NOT IN (
+                            SELECT fk_user 
+                            FROM test_assignment_user 
+                            WHERE fk_assignment = ? AND completed = 1
+                        )";
+        
         $deleteStmt = $conn->prepare($deleteQuery);
-        $deleteStmt->bind_param("i", $assignmentId);
+        $deleteStmt->bind_param("ii", $assignmentId, $assignmentId);
         $deleteStmt->execute();
         $rowsDeleted = $conn->affected_rows;
         $deleteStmt->close();
         
-        error_log("Deleted $rowsDeleted existing assignments");
+        error_log("Deleted $rowsDeleted existing assignments (excluding completed tests)");
+        
+        // Get count of preserved users (those who completed the test)
+        $preservedQuery = "SELECT COUNT(*) as preserved_count 
+                          FROM test_assignment_user 
+                          WHERE fk_assignment = ? AND completed = 1";
+        $preservedStmt = $conn->prepare($preservedQuery);
+        $preservedStmt->bind_param("i", $assignmentId);
+        $preservedStmt->execute();
+        $preservedResult = $preservedStmt->get_result();
+        $preservedRow = $preservedResult->fetch_assoc();
+        $response['preserved_count'] = $preservedRow['preserved_count'];
+        $preservedStmt->close();
         
         // Insert new assignments if there are any users
         if (!empty($userIds)) {
+            // Get existing users to avoid duplicates
+            $existingQuery = "SELECT fk_user FROM test_assignment_user WHERE fk_assignment = ?";
+            $existingStmt = $conn->prepare($existingQuery);
+            $existingStmt->bind_param("i", $assignmentId);
+            $existingStmt->execute();
+            $existingResult = $existingStmt->get_result();
+            
+            $existingUsers = [];
+            while ($row = $existingResult->fetch_assoc()) {
+                $existingUsers[] = $row['fk_user'];
+            }
+            $existingStmt->close();
+            
             $insertQuery = "INSERT INTO test_assignment_user (fk_assignment, fk_user) VALUES (?, ?)";
             $insertStmt = $conn->prepare($insertQuery);
             
             $addedCount = 0;
             foreach ($userIds as $userId) {
-                $insertStmt->bind_param("ii", $assignmentId, $userId);
-                if ($insertStmt->execute()) {
-                    $addedCount++;
+                // Only insert if user doesn't already exist in assignment
+                if (!in_array($userId, $existingUsers)) {
+                    $insertStmt->bind_param("ii", $assignmentId, $userId);
+                    if ($insertStmt->execute()) {
+                        $addedCount++;
+                    }
                 }
             }
             $insertStmt->close();
@@ -59,8 +94,8 @@ try {
         
         $response['success'] = true;
         $response['message'] = empty($userIds) 
-            ? "All users removed from assignment" 
-            : "Assignment users updated successfully";
+            ? "Users list updated successfully" 
+            : "Users list updated successfully";
             
     } catch (Exception $e) {
         $conn->rollback();

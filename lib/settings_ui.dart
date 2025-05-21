@@ -93,9 +93,16 @@ class _SettingScreenState extends State<SettingScreen> {
       final responseData = jsonDecode(response.body);
 
       if (responseData['success']) {
-        user_info = UserInfo.fromJson(responseData['userData']);
+        // Update the user info immediately
+        final updatedUser = UserInfo.fromJson(responseData['userData']);
         Provider.of<UserInfoProvider>(context, listen: false)
-            .setUserInfo(user_info);
+            .setUserInfo(updatedUser);
+        
+        // Update local state
+        setState(() {
+          user_info = updatedUser;
+        });
+        
         _showSuccessSnackBar('Profile updated successfully');
       } else {
         _showErrorSnackBar(responseData['message'] ?? 'Failed to update profile');
@@ -189,99 +196,115 @@ class _SettingScreenState extends State<SettingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        appBarTheme: AppBarTheme(
+          titleTextStyle: TextStyle(
+            color: Colors.deepPurple,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(
+            color: Colors.deepPurple,
+          ),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Current User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Name: ${user_info.name}'),
-            Text('Email: ${user_info.email}'),
-            const SizedBox(height: 24),
-            const Text('Update User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'New Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'New Email',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passNewController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'New Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passRepeatController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Repeat New Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Current Password (required)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: saveUserInfo,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Settings'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Current User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Name: ${user_info.name}'),
+              Text('Email: ${user_info.email}'),
+              const SizedBox(height: 24),
+              const Text('Update User Info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'New Name',
+                  border: OutlineInputBorder(),
                 ),
-                child: const Text('Save Changes'),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: disconnectUser,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'New Email',
+                  border: OutlineInputBorder(),
                 ),
-                child: const Text('Logout'),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: deleteAccount,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.red,
+              const SizedBox(height: 16),
+              TextField(
+                controller: passNewController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'New Password',
+                  border: OutlineInputBorder(),
                 ),
-                child: const Text('Delete Account'),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: passRepeatController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Repeat New Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Current Password (required)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: saveUserInfo,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('Save Changes'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: disconnectUser,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('Logout'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: deleteAccount,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.red,
+                  ),
+                  child: const Text('Delete Account'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

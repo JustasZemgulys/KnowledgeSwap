@@ -25,6 +25,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String name = '';
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;  // Add this check
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -32,6 +33,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    repeatPasswordController.dispose();
+    super.dispose();
   }
 
   Future<void> registerUser() async {
@@ -83,9 +93,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> processRegistration(dynamic userData, String recipientEmail) async {
     String? verificationCode = await sendMail(recipientEmail, context);
 
-    if (verificationCode != null) {
+    if (verificationCode != null && mounted) {  // Add mounted check
       bool verified = await showVerificationDialog(verificationCode);
-      if (verified) {
+      if (verified && mounted) {  // Add mounted check
         final getIP = GetIP();
         final userIP = await getIP.getUserIP();
         final registerApiUrl = '$userIP/register.php';
@@ -102,14 +112,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
           if (registerResponse.statusCode == 200 || registerResponse.statusCode == 201) {
             final registerData = jsonDecode(registerResponse.body);
-            if (registerData['success']) {
+            if (registerData['success'] && mounted) {  // Add mounted check
               user_info = UserInfo.fromJson(registerData['userData']);
               UserInfoProvider userInfoProvider =
                   Provider.of<UserInfoProvider>(context, listen: false);
-              userInfoProvider.setUserInfo(user_info!);
+              await userInfoProvider.setUserInfo(user_info!);
               clearControllers();
               
-              // Show success SnackBar
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(registerData['message'] ?? 'Registration successful!'),
@@ -118,17 +127,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               );
               
-              // Wait for SnackBar to complete then navigate
               await Future.delayed(const Duration(seconds: 3));
-              Navigator.popUntil(context, (route) => route.isFirst);
-            } else {
+              if (mounted) {  // Check before navigation
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
+            } else if (mounted) {
               _showErrorSnackBar(registerData['message'] ?? 'Registration failed');
             }
-          } else {
+          } else if (mounted) {
             _showErrorSnackBar('Server error occurred during registration');
           }
         } catch (e) {
-          _showErrorSnackBar('Error during registration. Please try again.');
+          if (mounted) _showErrorSnackBar('Error during registration. Please try again.');
         }
       }
     }
@@ -147,20 +157,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && mounted) {  // Add mounted check
         final responseData = jsonDecode(response.body);
         if (responseData['success']) {
           return responseData['verificationCode'];
-        } else {
+        } else if (mounted) {
           _showErrorSnackBar(responseData['message'] ?? 'Failed to send verification email');
-          return null;
         }
-      } else {
+      } else if (mounted) {
         _showErrorSnackBar('Failed to send verification email');
-        return null;
       }
+      return null;
     } catch (e) {
-      _showErrorSnackBar('Network error while sending verification email');
+      if (mounted) _showErrorSnackBar('Network error while sending verification email');
       return null;
     }
   }

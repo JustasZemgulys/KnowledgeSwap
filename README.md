@@ -1,16 +1,42 @@
 # knowledgeswap
 
-A new Flutter project.
+KnowledgeSwap - Automated Test Generation Learning System
+# Overview
 
-## Getting Started
+KnowledgeSwap is an interactive learning platform with AI-powered test generation, designed to enhance both individual and collaborative learning experiences. The system allows users to create, share, and manage educational resources, tests, and groups while leveraging artificial intelligence to automate content creation.
+# Key Features
 
-This project is a starting point for a Flutter application.
+    User Management: Registration, login, profile customization
 
-A few resources to get you started if this is your first Flutter project:
+    Resource Sharing: Create, edit, and share learning materials
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+    AI Test Generation: Automatically generate questions from provided content
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+    Community Features: Group creation, task assignment, discussion forums
+
+    Collaboration Tools: Peer review, answer sharing, and feedback systems
+
+# Technology Stack
+
+    Frontend: Flutter (Dart)
+
+    Backend: PHP
+
+    Database: MySQL
+
+    AI Integration: Mistral Tiny model for question generation
+
+# System Requirements
+
+    Modern web browser (Chrome, Firefox, Edge)
+
+    Internet connection
+
+# Installation
+
+The system is web-based and accessible at the following link (2025-05-21):
+https://juszem1-1.stud.if.ktu.lt/
+
+# Project Status
+
+Completed as a Bachelor's thesis project at Kaunas University of Technology (2025)

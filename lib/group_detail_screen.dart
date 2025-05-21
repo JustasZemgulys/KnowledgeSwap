@@ -1512,12 +1512,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                                   ? const Text('Moderator', style: TextStyle(color: Colors.green))
                                                   : null,
                                           trailing: (isAdmin || isModerator) && 
-                                                    member['id'] != user_info.id
-                                              ? IconButton(
-                                                  icon: const Icon(Icons.more_vert),
-                                                  onPressed: () => _showUserActions(context, member),
-                                                )
-                                              : null,
+                                                  member['id'] != user_info.id
+                                            ? IconButton(
+                                                icon: const Icon(Icons.more_vert),
+                                                onPressed: () => _showUserActions(context, member),
+                                              )
+                                            : null,
                                         );
                                       }),
                                     

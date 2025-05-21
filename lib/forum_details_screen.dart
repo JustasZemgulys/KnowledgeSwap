@@ -36,6 +36,9 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
   String? replyingToUsername;
   List<dynamic> comments = [];
   final int _maxCommentLength = 1000;
+  final Map<int, bool> _minimizedComments = {};
+  final int _minimizeThreshold = 100;
+
 
   @override
   void initState() {
@@ -358,6 +361,42 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     );
   }
 
+// Fix the _buildNestedComments method (line 364-368)
+Widget _buildNestedComments(List<dynamic> allComments, {int? parentId, int depth = 0}) {
+  final childComments = allComments.where((c) => 
+    (parentId == null && c['parent_id'] == null) || 
+    (parentId != null && c['parent_id'] == parentId)
+  ).toList(); // Fixed the parenthesis and toList placement
+  
+  if (childComments.isEmpty) return const SizedBox();
+
+  return Column(
+    children: [
+      for (final comment in childComments) ...[
+        Container(
+          decoration: depth > 0
+              ? BoxDecoration(
+                  border: Border(
+                    left: BorderSide(
+                      color: Colors.grey[300]!,
+                      width: 2.0,
+                    ),
+                  ),
+                )
+              : null,
+          padding: EdgeInsets.only(left: depth * 16.0),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: _buildCommentItem(comment),
+          ),
+        ),
+        if (!(_minimizedComments[comment['id']] ?? false))
+          _buildNestedComments(allComments, parentId: comment['id'], depth: depth + 1),
+      ],
+    ],
+  );
+}
+
   Widget _buildCommentItem(dynamic comment) {
     final isAuthor = comment['fk_user'] == userInfo.id;
     final isDeleted = comment['is_deleted'] == true || comment['user_exists'] == false;
@@ -368,6 +407,9 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
     final userVote = comment['user_vote'];
     final isReply = comment['parent_id'] != null;
     final parentUsername = isReply ? _getParentCommentName(comment['parent_id']) : null;
+    final shouldOfferMinimize = text.length > _minimizeThreshold || 
+        comments.any((c) => c['parent_id'] == comment['id']);
+    final isMinimized = _minimizedComments[comment['id']] ?? false;
 
     return Card(
       elevation: 2,
@@ -444,6 +486,15 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
                         ],
                       ),
                       const Spacer(),
+                      if (shouldOfferMinimize)
+                        IconButton(
+                          icon: Icon(isMinimized ? Icons.expand_more : Icons.expand_less),
+                          onPressed: () {
+                            setState(() {
+                              _minimizedComments[comment['id']] = !isMinimized;
+                            });
+                          },
+                        ),
                       if (!isDeleted && isAuthor)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, size: 20),
@@ -485,9 +536,14 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
                         ),
                       ),
                     ),
-                  Text(text),
+                  if (!isMinimized) Text(text),
+                  if (isMinimized)
+                    Text(
+                      text.length > 50 ? '${text.substring(0, 50)}...' : text,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
                   const SizedBox(height: 8),
-                  if (!isDeleted)
+                  if (!isDeleted && !isMinimized)
                     TextButton(
                       onPressed: () => _handleReply(comment['id'], name),
                       child: const Text('Reply'),
@@ -719,7 +775,7 @@ class _ForumDetailsScreenState extends State<ForumDetailsScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  ...comments.map(_buildCommentItem).toList(),
+                  _buildNestedComments(comments),
                 ],
               ),
             ),

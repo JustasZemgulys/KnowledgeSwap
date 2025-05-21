@@ -1,6 +1,4 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/octet-stream");
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);

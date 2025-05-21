@@ -7,6 +7,8 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'db_connect.php';
+require 'vendor/autoload.php';
+
 $conn = getDBConnection();
 
 $apiKey = "nECGxBiPP3s9uHR2s09PLSsjUC7xbtwZ";
@@ -49,17 +51,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $resourcePath = $resource['resource_link'];
     $extractedText = "";
 
-    if (!empty($resourcePath)) {
-        $filePath = __DIR__ . '/' . ltrim($resourcePath, '/');
-        $fileType = mime_content_type($filePath);
-        $extractionResult = extractTextFromFile($filePath, $fileType);
-        
-        if (!is_array($extractionResult)) {
-            $extractedText = $extractionResult;
-        } else {
-            log_message("Text extraction failed: " . print_r($extractionResult, true));
-        }
-    }
+	if (!empty($resourcePath)) {
+		$filePath = __DIR__ . '/' . ltrim($resourcePath, '/');
+		$fileType = mime_content_type($filePath);
+		$extractionResult = extractTextFromFile($filePath, $fileType);
+		
+		// If extraction failed (returned an array with error info)
+		if (is_array($extractionResult)) {
+			log_message("Text extraction failed - aborting");
+			die(json_encode([
+				'success' => false,
+				'error' => $extractionResult['error'],
+				'details' => $extractionResult['details'],
+				'solution' => $extractionResult['solution']
+			]));
+		}
+		
+		$extractedText = $extractionResult;
+	}
+	log_message("Text extracted:");
+	log_message($extractedText);
 
     // Generate questions with retry logic
     $questions = [];
@@ -424,22 +435,106 @@ FORMAT;
 function extractTextFromPDF($filePath) {
     try {
         log_message("Starting PDF processing for: " . basename($filePath));
-        $parser = new \Smalot\PdfParser\Parser();
-        log_message("PDF parser initialized");
-        $pdf = $parser->parseFile($filePath);
-        log_message("PDF parsed successfully");
         
-        $text = $pdf->getText();
-        log_message("Text extracted from PDF");
-        
-        if (empty(trim($text))) {
-            throw new Exception("No text content found - possibly image-based PDF");
+        // Method 1: Try pdftotext first (fastest)
+        if (function_exists('shell_exec') && shell_exec('which pdftotext')) {
+            $text = extractWithPdftotext($filePath);
+            if (!empty(trim($text))) return $text;
         }
         
-        return $text;
-    } catch (\Exception $e) {
-        log_message("PDF Error: " . $e->getMessage());
-        throw $e;
+        // Method 2: Try PHP parser
+        $text = extractWithPHPParser($filePath);
+        if (!empty(trim($text))) return $text;
+        
+        // Method 3: Try OCR as last resort
+        return extractWithOCR($filePath);
+        
+    } catch (Exception $e) {
+        log_message("PDF Extraction Error: " . $e->getMessage());
+        return [
+            "error" => "PDF text extraction failed",
+            "details" => $e->getMessage(),
+            "solution" => "This appears to be an image-based PDF. Try uploading a text-based PDF or a clear image file."
+        ];
+    }
+}
+
+/**
+ * Method 1: Extract using pdftotext command-line tool
+ */
+function extractWithPdftotext($filePath) {
+    $tempFile = tempnam(sys_get_temp_dir(), 'pdftext');
+    $command = sprintf(
+        'pdftotext -layout -nopgbrk "%s" "%s" 2>&1',
+        escapeshellarg($filePath),
+        escapeshellarg($tempFile)
+    );
+    
+    shell_exec($command);
+    
+    if (!file_exists($tempFile)) {
+        throw new Exception("pdftotext failed to create output file");
+    }
+    
+    $text = file_get_contents($tempFile);
+    unlink($tempFile);
+    
+    return $text;
+}
+
+/**
+ * Method 2: Extract using PHP PDF parser
+ */
+function extractWithPHPParser($filePath) {
+    $parser = new \Smalot\PdfParser\Parser([
+        'retainImageContent' => false
+    ]);
+    
+    $pdf = $parser->parseFile($filePath);
+    $text = $pdf->getText();
+    
+    // Clean up text
+    $text = preg_replace('/\s+/', ' ', $text);
+    return trim($text);
+}
+
+/**
+ * Method 3: Extract using OCR (for image-based PDFs)
+ */
+function extractWithOCR($filePath) {
+    log_message("Attempting OCR for image-based PDF");
+    
+    // Convert PDF to image first
+    $imageFile = convertPdfToImage($filePath);
+    if (!$imageFile) {
+        throw new Exception("PDF to image conversion failed");
+    }
+    
+    // Use OCR on the image
+    return ocrWithCloudService($imageFile, 'image/png');
+}
+
+/**
+ * Convert PDF to image for OCR processing
+ */
+function convertPdfToImage($pdfPath) {
+    if (!extension_loaded('imagick')) {
+        throw new Exception("ImageMagick not available for PDF conversion");
+    }
+    
+    try {
+        $imagick = new Imagick();
+        $imagick->setResolution(300, 300);
+        $imagick->readImage($pdfPath . '[0]'); // First page only
+        $imagick->setImageFormat('png');
+        
+        $tempImage = tempnam(sys_get_temp_dir(), 'pdfimg') . '.png';
+        $imagick->writeImage($tempImage);
+        $imagick->clear();
+        
+        return $tempImage;
+    } catch (Exception $e) {
+        throw new Exception("PDF to image conversion failed: " . $e->getMessage());
     }
 }
 
